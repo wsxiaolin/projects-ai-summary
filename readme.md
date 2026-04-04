@@ -54,6 +54,10 @@ SPARK_ENDPOINT=https://spark-api-open.xf-yun.com/v1/chat/completions
 
 在 GitHub Settings → Secrets and variables → Actions 中添加相应的 Secrets。
 
+> 注意：工作流里如果某个 Secret 未设置，GitHub Actions 会把它注入为空字符串（不是 `undefined`）。
+> 本项目会把空字符串视为“未配置”，因此请确保至少设置 `OPENAI_API_KEY` 或 `SPARK_API_PASSWORD` 其中之一。
+> 另外请务必使用 `PL_USERNAME` / `PL_PASSWORD` 这两个名称，不要误用系统自带的 `USERNAME` / `PASSWORD` 环境变量。
+
 ## 本地命令
 
 ```bash
@@ -63,4 +67,3 @@ npm run run-bot-once       # 运行一轮机器人
 npm run discipline-stats   # 统计学科分布
 npm run flexible-collect -- --tag "精选" --take -50  # 灵活收集
 ```
-
