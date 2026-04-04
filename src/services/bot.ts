@@ -187,3 +187,85 @@ export async function runDiscussionBot(): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * 运行讨论机器人一轮（处理一批消息后自动退出）
+ */
+export async function runDiscussionBotOnce(): Promise<void> {
+  const bot = new pl.Bot(
+    config.plUsername,
+    config.plPassword,
+    // processFn：处理消息的函数
+    async (msg: { Content: string }) => {
+      try {
+        const filters = parseQuery(msg.Content);
+        if (!filters) return helpMessage();
+
+        const rows = await searchRecords(filters);
+        if (rows.length === 0) {
+          return '未命中记录，请缩小条件或更换关键词。\n' + helpMessage();
+        }
+
+        // 构建查询信息摘要
+        let queryInfo = '【查询内容】\n';
+        if (filters.keywords && filters.keywords.length > 0) {
+          queryInfo += `关键词: ${filters.keywords.join(', ')}\n`;
+        }
+        if (filters.author) {
+          queryInfo += `作者: ${filters.author}\n`;
+        }
+        if (filters.year) {
+          queryInfo += `年份: ${filters.year}\n`;
+        }
+        if (filters.yearFrom || filters.yearTo) {
+          queryInfo += `年份范围: ${filters.yearFrom ?? '不限'} - ${filters.yearTo ?? '不限'}\n`;
+        }
+        queryInfo += `\n【查询结果】(共${rows.length}条)\n`;
+
+        // 构建结果列表，包含摘要和关键词
+        const lines = rows.map((x) => {
+          const keywords = x.keyWords ? JSON.parse(x.keyWords).slice(0, 3).join(', ') : '';
+          const summary = x.summary ? x.summary.substring(0, 100) : '';
+          return `<discussion=${x.id}>${x.name}</discussion> | ${x.userName} | ${x.year}
+        📝 摘要: ${summary}${summary.length >= 50 ? '...' : ''}
+        🔑 关键词: ${keywords}`;
+        });
+
+        return `<size=28>${queryInfo}${lines.join('\n\n')}</size>`;
+      } catch (error) {
+        console.error('[Bot] 查询处理失败:', error instanceof Error ? error.message : String(error));
+        return '处理查询时出错，请稍后重试。';
+      }
+    },
+    // catched：捕获消息后的回调
+    (msg: any) => {
+      console.log(`[Bot] 捕获消息: ${msg.ID} 来自 ${msg.Nickname}: ${msg.Content.substring(0, 50)}`);
+    },
+    // replyed：成功回复后的回调
+    (msg: any) => {
+      console.log(`[Bot] 回复成功: ${msg.ID}`);
+    },
+    // finnished：任务队列清空后的回调
+    (finnish: Set<string>) => {
+      console.log(`[Bot] 本轮处理完成，已处理 ${finnish.size} 条消息`);
+    }
+  );
+
+  try {
+    console.log('[Bot] 初始化中...');
+    await bot.init(config.discussionId, 'Discussion', {
+      ignoreReplyToOters: true,
+      readHistory: true,
+      replyRequired: false
+    });
+    
+    console.log('[Bot] 运行一轮...');
+    // 仅运行一次，不设置轮询
+    await bot.run();
+    
+    console.log('[Bot] 一轮处理完成');
+  } catch (error) {
+    console.error('[Bot] 启动失败:', error instanceof Error ? error.message : String(error));
+    throw error;
+  }
+}

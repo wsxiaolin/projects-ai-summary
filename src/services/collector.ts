@@ -1,5 +1,5 @@
 import { createUser } from '../pl/client';
-import { analyzeContent } from './spark';
+import { analyzeContent, analyzeContentWithModel } from './analyse';
 import { insertOne, queryById } from '../db/repository';
 import { DataRecord } from '../types/data';
 
@@ -50,20 +50,68 @@ function toRecord(project: any, summary: any, llm: any): DataRecord {
   };
 }
 
-export async function collectByTag(tag: string): Promise<{ inserted: number; skipped: number }> {
+/**
+ * 通用的数据收集函数，支持自定义tag、skip值和AI模型
+ * 支持自动分页获取超过API单次限制的数据
+ * @param tag - 要查询的标签
+ * @param skip - 跳过的记录数，默认为0
+ * @param model - AI模型名称，如果未提供则使用配置中的默认模型
+ * @param take - 获取的记录数，负数表示绕过API限制的数量（-100获取100条，-300分3次各100条）
+ *              默认为-100（获取最近100条）
+ * @returns 收集结果统计
+ */
+export async function collectByTagWithOptions(
+  tag: string, 
+  discussionType: string,
+  skip: number = 0, 
+  model?: string,
+  take: number = -100
+): Promise<{ inserted: number; skipped: number }> {
   const user = await createUser();
-  const list = await user.projects.query('Experiment', { tags: [tag], take: -100, skip: 100});
+  
+  // 自动分页获取数据（plweb API需要用负数绕过单次返回限制）
+  let allItems: any[] = [];
+  const takeAbsolute = Math.abs(take);
+  const singlePageSize = 100; // 单次请求最多100条（用负数绕过）
+  
+  let currentSkip = skip;
+  let remaining = takeAbsolute;
+  
+  while (remaining > 0) {
+    const currentTake = Math.min(remaining, singlePageSize);
+    // 使用负数来绕过API限制
+    const takeValue = -currentTake;
+    console.log(`[collectByTagWithOptions] 分页获取: skip=${currentSkip}, take=${takeValue}`);
+    
+    const list = await user.projects.query(discussionType, { tags: [tag], take: takeValue, skip: currentSkip });
+    const items = list.Data.$values ?? [];
+    
+    if (items.length === 0) {
+      console.log(`[collectByTagWithOptions] 已到数据末尾`);
+      break;
+    }
+    
+    allItems = allItems.concat(items);
+    remaining -= items.length;
+    currentSkip += items.length;
+    
+    // 分页间延迟，避免频繁请求
+    if (remaining > 0) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  
   let inserted = 0;
   let skipped = 0;
   
-  const items = list.Data.$values ?? [];
+  const items = allItems;
   const batchSize = 10;
 
   // 分批处理：每批10个作品
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
     const batchNum = Math.floor(i / batchSize) + 1;
-    console.log(`[collectByTag] 开始处理第 ${batchNum} 批 (共${Math.ceil(items.length / batchSize)}批)`);
+    console.log(`[collectByTagWithOptions] 开始处理第 ${batchNum} 批 (共${Math.ceil(items.length / batchSize)}批)`);
     
     // 当前批的待分析数据
     const sourcesToAnalyze: Array<{ item: any; summary: any; text: string }> = [];
@@ -73,15 +121,15 @@ export async function collectByTag(tag: string): Promise<{ inserted: number; ski
       // 检查ID是否已经被检查过处理过，如果已处理则跳过API请求
       const exist = await queryById(item.ID);
       if (exist.length > 0) {
-        console.log(`[collectByTag] ID已检查过，跳过: ${item.ID}`);
+        console.log(`[collectByTagWithOptions] ID已检查过，跳过: ${item.ID}`);
         batchSkipped += 1;
         continue;
       }
 
-      const summary = await user.projects.getSummary(item.ID, 'Experiment');
+      const summary = await user.projects.getSummary(item.ID, discussionType);
       const text = summary.Data.Description.join('');
       if (!text.trim()) {
-        console.log(`[collectByTag] 内容为空，跳过: ${item.ID}`);
+        console.log(`[collectByTagWithOptions] 内容为空，跳过: ${item.ID}`);
         batchSkipped += 1;
         continue;
       }
@@ -91,14 +139,17 @@ export async function collectByTag(tag: string): Promise<{ inserted: number; ski
 
     // 并发调用API分析（当前批）
     if (sourcesToAnalyze.length > 0) {
-      console.log(`[collectByTag] 第 ${batchNum} 批: 开始并发分析 ${sourcesToAnalyze.length} 条记录...`);
+      console.log(`[collectByTagWithOptions] 第 ${batchNum} 批: 开始并发分析 ${sourcesToAnalyze.length} 条记录...`);
       const analyzeTasks = sourcesToAnalyze.map(({ item, summary, text }) => async () => {
-        console.log(`[collectByTag] 分析ID: ${item.ID}`);
+        console.log(`[collectByTagWithOptions] 分析ID: ${item.ID}`);
         try {
-          const llm = await analyzeContent(text);
+          // 根据是否提供了model参数选择调用方式
+          const llm = model 
+            ? await analyzeContentWithModel(text, model)
+            : await analyzeContent(text);
           return { item, summary, llm, error: null };
         } catch (error) {
-          console.error(`[collectByTag] API分析失败，跳过ID: ${item.ID}`, error instanceof Error ? error.message : String(error));
+          console.error(`[collectByTagWithOptions] API分析失败，跳过ID: ${item.ID}`, error instanceof Error ? error.message : String(error));
           return { item, summary, llm: null, error };
         }
       });
@@ -122,7 +173,7 @@ export async function collectByTag(tag: string): Promise<{ inserted: number; ski
 
       // 并发执行数据库插入（当前批）
       if (insertTasks.length > 0) {
-        console.log(`[collectByTag] 第 ${batchNum} 批: 开始并发插入 ${insertTasks.length} 条记录...`);
+        console.log(`[collectByTagWithOptions] 第 ${batchNum} 批: 开始并发插入 ${insertTasks.length} 条记录...`);
         const insertResults = await runWithConcurrency(insertTasks, 10);
         inserted += insertResults.length;
       }
@@ -136,8 +187,16 @@ export async function collectByTag(tag: string): Promise<{ inserted: number; ski
     }
   }
 
-  console.log(`[collectByTag] 完成! 插入: ${inserted}, 跳过: ${skipped}`);
+  console.log(`[collectByTagWithOptions] 完成! 插入: ${inserted}, 跳过: ${skipped}`);
   return { inserted, skipped };
+}
+
+/**
+ * 原有的collectByTag函数，现在作为collectByTagWithOptions的包装器
+ * 保持向后兼容性
+ */
+export async function collectByTag(tag: string,discussionType: string): Promise<{ inserted: number; skipped: number }> {
+  return collectByTagWithOptions(tag,discussionType);
 }
 
 export async function backfillByDiscussionIds(ids: string[]): Promise<{ inserted: number; skipped: number }> {

@@ -5,16 +5,18 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "init": "node dist/index.js",
     "update-db": "node dist/scripts/updateDatabase.js",
     "run-bot": "node dist/scripts/runBot.js",
-    "scheduler": "node dist/scripts/scheduler.js",
-    "check-history": "node dist/scripts/checkHistory.js"
+    "run-bot-once": "node dist/scripts/runBotOnce.js",
+    "discipline-stats": "node dist/scripts/disciplineStats.js",
+    "flexible-collect": "node dist/scripts/collect.js"
   },
   "dependencies": {
     "axios": "^1.7.3",
     "dotenv": "^16.4.5",
     "node-cron": "^3.0.3",
+    "openai": "^4.58.0",
     "physics-lab-web-api": "^0.4.1",
     "plweb": "^0.2.1",
     "sql.js": "^1.8.0"
