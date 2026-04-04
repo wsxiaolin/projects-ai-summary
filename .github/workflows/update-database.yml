@@ -8,6 +8,7 @@ on:
 jobs:
   update-db:
     runs-on: ubuntu-latest
+    environment: pl-search
     steps:
 
     - name: Checkout code

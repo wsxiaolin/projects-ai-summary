@@ -8,6 +8,7 @@ on:
 jobs:
   bot-query:
     runs-on: ubuntu-latest
+    environment: pl-search
     steps:
 
     - name: Checkout code
