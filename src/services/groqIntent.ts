@@ -111,30 +111,72 @@ export async function expandKeywordsWithGroq(
   const url = getGroqChatCompletionsUrl();
   if (!url) return { extraKeywords: [] };
 
-  const prompt = `你是专业的学术与搜索查询词优化引擎。请输出 JSON，格式为 {"extraKeywords": string[], "reason": string}。
-你的核心任务是给出最多5个高价值的额外关键词，必须遵循以下处理优先级：
-1. 拼写与格式纠正：修复大小写、缺失的空格、错误的标点
-2. 错别字与俗称纠正：识别用户的错别字或俗称，转换为学术标准名称（如 阿式园 -> 阿氏圆, 阿波罗尼斯圆）。
-3. 缩写与全称互转：(如 NLP -> 自然语言处理, Natural Language Processing)。
-4. 自然语言提取：如果输入是长句，提取核心名词。
+  const prompt = `
+  你是一个“搜索查询纠错与对齐引擎”，主要目标是修复和标准化用户输入，而不是进行知识扩展。
 
-硬约束：
-- 不要改变原始查询的核心意图。
-- 仅保留简短的关键词，避免长句。
-- 如果没有合适的扩展，extraKeywords 返回空数组。
+请输出 JSON：
+{"extraKeywords": string[], "reason": string}
 
-【示例】
-输入: "Physicslab"
-输出: {"extraKeywords": ["Physics Lab", "Physics Laboratory", "PhysicsLab"], "reason": "补充缺失的空格并扩展全称"}
+【核心原则】
+优先进行“纠错”和“等价对齐”，禁止无关扩展。
 
-输入: "P.E."
-输出: {"extraKeywords": ["PE", "Physical Education", "体育"], "reason": "清理多余标点并扩展全称"}
+【处理优先级】
 
-输入: "帮我找一下圆曲线的相关内容" 
-输出: {"extraKeywords": ["圆锥曲线", "椭圆", "双曲线", "抛物线" ], "reason": "圆曲线是错误拼写，用户想表达的是圆锥曲线，他又可以细分"}
+1. 拼写纠错（最高优先级）
+   - 修复拼写错误或近似词（如 Reump → Trump）
+   - 可输出正确词及其常见中文/英文名称（如 特朗普 / Trump / Donald Trump）
+
+2. 专有名词对齐
+   - 如果是人名、术语、地名等：
+     仅允许输出：
+     - 标准全名（Trump → Donald Trump）
+     - 常见别名或翻译（特朗普）
+     - 英文/中文对应
+
+3. 错别字纠正
+   - 如 阿式园 → 阿氏圆 / 阿波罗尼斯圆
+
+4. 缩写展开
+   - NLP → 自然语言处理 / Natural Language Processing
+
+【严格限制】
+
+- ❌ 禁止上位概念扩展（如 阿氏圆 → 圆锥曲线）
+- ❌ 禁止学科泛化（如 任意词 → 数学体系）
+- ❌ 禁止基于词面联想进行扩展（如看到“圆”就扩展几何体系）
+- ❌ 禁止生成与输入语义不直接等价或高度相关的词
+
+【判断标准（非常关键）】
+
+只有满足以下之一，才允许加入 extraKeywords：
+- 拼写纠正结果
+- 同一实体的不同表达（全名 / 简写 / 翻译）
+- 明确的同义词或别名
+
+否则：
+→ 返回 []
+
+【输出要求】
+
+- 最多 5 个关键词
+- 必须是短词或短语
+- 不要为了凑数量输出
+
+【示例（不可复用模式）】
+
+输入: "Reump"
+输出: {"extraKeywords": ["Trump", "特朗普", "Donald Trump"], "reason": "拼写纠错并提供标准名称"}
+
+输入: "Trump"
+输出: {"extraKeywords": ["Donald Trump", "特朗普"], "reason": "补充标准全名与中文翻译"}
 
 输入: "阿式园"
-输出: {"extraKeywords": ["阿氏圆", "阿波罗尼斯圆", "Apollonian circles"], "reason": "纠正错别字并提供数学学术名词"}`;
+输出: {"extraKeywords": ["阿氏圆", "阿波罗尼斯圆", "Apollonian circle"], "reason": "纠正错别字并提供标准术语"}
+
+
+输入: "随便写点"
+输出: {"extraKeywords": [], "reason": "无可纠错或对齐内容"}
+  `;
 
   try {
     const resp = await axios.post<GroqChatCompletionResponse>(
