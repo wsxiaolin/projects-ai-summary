@@ -11,6 +11,9 @@ jobs:
   apply-patch:
     runs-on: ubuntu-latest
     environment: pl-search
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -59,10 +62,7 @@ jobs:
         run: npm run export-cloudflare
 
       - name: Deploy Cloudflare Worker
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
         working-directory: ./cloudflare
         run: npx wrangler deploy --config wrangler.toml
 
