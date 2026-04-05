@@ -1,28 +1,40 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-05T14:18:51.615Z",
+  "generatedAt": "2026-04-05T14:44:55.149Z",
   "operations": [
     {
       "operation": "upsert",
-      "id": "6983ee8a382c291b53ae7e6d",
-      "updatedAt": "2026-04-05T14:18:51.614Z",
+      "id": "000000501f76e37a6141bb17",
+      "updatedAt": "2026-04-05T14:44:55.148Z",
       "record": {
-        "id": "6983ee8a382c291b53ae7e6d",
-        "name": "？光粒打击可行吗",
-        "contentLength": 2355,
-        "userID": "66bc220e6188c424cbe6e198",
-        "userName": "tyq",
-        "editorID": "5f2e1445ef04fa1c9fff91f7",
-        "editorName": "沃尔夫冈",
-        "year": 2026,
-        "summary": "今天我们从理论上看《三体》中光粒打击的可行性，从相对论动能和天体引力束缚能的定量对比入手，以打击太阳为例进行计算，分析了其在物理规律层面的理论可行性及工程实现等方面不可行的方面，还补充了光粒速度与静质量的关系以及对系内行星的影响。",
-        "primaryDiscipline": "[\"理学\"]",
-        "secondaryDiscipline": "[\"物理学\"]",
-        "keyWords": "[\"光粒打击\",\"相对论动能\",\"恒星引力束缚能\",\"可行性分析\",\"洛伦兹因子\",\"多普勒效应\",\"热核反应失控\",\"能源供给\",\"星际导航\",\"系内行星影响\"]",
-        "readability": 0.3
+        "id": "000000501f76e37a6141bb17",
+        "name": "0",
+        "contentLength": 0,
+        "userID": "0",
+        "userName": "0",
+        "editorID": "0",
+        "editorName": "0",
+        "year": 0,
+        "summary": "0",
+        "primaryDiscipline": "[\"\"]",
+        "secondaryDiscipline": "[\"\"]",
+        "keyWords": "[\"\"]",
+        "readability": 0
       },
       "diff": {
-        "name": "？光粒打击可行吗"
+        "id": "000000501f76e37a6141bb17",
+        "name": "0",
+        "contentLength": 0,
+        "userID": "0",
+        "userName": "0",
+        "editorID": "0",
+        "editorName": "0",
+        "year": 0,
+        "summary": "0",
+        "primaryDiscipline": "[\"文学\"]",
+        "secondaryDiscipline": "[\"文学分析\"]",
+        "keyWords": "[\"菜单\"]",
+        "readability": 0
       }
     }
   ]
