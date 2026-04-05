@@ -112,70 +112,68 @@ export async function expandKeywordsWithGroq(
   if (!url) return { extraKeywords: [] };
 
   const prompt = `
-  你是一个“搜索查询纠错与对齐引擎”，主要目标是修复和标准化用户输入，而不是进行知识扩展。
+  你是一个“搜索查询纠错与对齐引擎”。
 
 请输出 JSON：
 {"extraKeywords": string[], "reason": string}
 
-【核心原则】
-优先进行“纠错”和“等价对齐”，禁止无关扩展。
+你的目标是：让用户的查询更容易命中正确结果，而不是扩展知识范围。
 
-【处理优先级】
+【允许的扩展类型（仅限以下）】
 
-1. 拼写纠错（最高优先级）
-   - 修复拼写错误或近似词（如 Reump → Trump）
-   - 可输出正确词及其常见中文/英文名称（如 特朗普 / Trump / Donald Trump）
+1. 拼写纠错
+   - Reump → Trump
 
-2. 专有名词对齐
-   - 如果是人名、术语、地名等：
-     仅允许输出：
-     - 标准全名（Trump → Donald Trump）
-     - 常见别名或翻译（特朗普）
-     - 英文/中文对应
+2. 同一实体的不同表达
+   - Trump → Donald Trump / 特朗普
+   - 阿氏圆 → 阿波罗尼斯圆
 
-3. 错别字纠正
-   - 如 阿式园 → 阿氏圆 / 阿波罗尼斯圆
+3. 跨语言映射（非常重要）
+   - galgame → 视觉小说 / visual novel
+   - iPhone → 苹果手机
 
-4. 缩写展开
-   - NLP → 自然语言处理 / Natural Language Processing
+4. 领域内常用别称 / 习惯说法
+   - 必须是用户真实可能搜索的等价表达
+   - 例如：galgame ↔ 视觉小说
 
-【严格限制】
+【严格禁止】
 
-- ❌ 禁止上位概念扩展（如 阿氏圆 → 圆锥曲线）
-- ❌ 禁止学科泛化（如 任意词 → 数学体系）
-- ❌ 禁止基于词面联想进行扩展（如看到“圆”就扩展几何体系）
-- ❌ 禁止生成与输入语义不直接等价或高度相关的词
+- ❌ 上位概念扩展（如 阿氏圆 → 圆锥曲线）
+- ❌ 学科扩展（如 扩展到数学/物理体系）
+- ❌ 泛化分类（如 Trump → 政治人物）
+- ❌ 仅因词面相似进行联想
 
-【判断标准（非常关键）】
+【判断标准】
 
-只有满足以下之一，才允许加入 extraKeywords：
-- 拼写纠正结果
-- 同一实体的不同表达（全名 / 简写 / 翻译）
-- 明确的同义词或别名
+只有当新关键词满足以下条件之一，才允许输出：
+- 与原词指向同一事物
+- 或是用户在实际搜索中会互换使用的表达
 
 否则：
 → 返回 []
 
 【输出要求】
 
-- 最多 5 个关键词
-- 必须是短词或短语
-- 不要为了凑数量输出
+- 最多 5 个
+- 简短词或短语
+- 不要凑数量
 
 【示例（不可复用模式）】
 
+输入: "galgame"
+输出: {"extraKeywords": ["视觉小说", "visual novel"], "reason": "领域内常用等价表达"}
+
 输入: "Reump"
-输出: {"extraKeywords": ["Trump", "特朗普", "Donald Trump"], "reason": "拼写纠错并提供标准名称"}
+输出: {"extraKeywords": ["Trump", "特朗普", "Donald Trump"], "reason": "拼写纠错与名称对齐"}
 
-输入: "Trump"
-输出: {"extraKeywords": ["Donald Trump", "特朗普"], "reason": "补充标准全名与中文翻译"}
+输入: "阿氏圆"
+输出: {"extraKeywords": ["阿波罗尼斯圆", "Apollonian circle"], "reason": "标准术语"}
 
-输入: "阿式园"
-输出: {"extraKeywords": ["阿氏圆", "阿波罗尼斯圆", "Apollonian circle"], "reason": "纠正错别字并提供标准术语"}
-
+输入: "阿氏圆的研究"
+输出: {"extraKeywords": ["阿波罗尼斯圆"], "reason": "术语对齐"}
 
 输入: "随便写点"
-输出: {"extraKeywords": [], "reason": "无可纠错或对齐内容"}
+输出: {"extraKeywords": [], "reason": "无有效对齐"}
   `;
 
   try {
