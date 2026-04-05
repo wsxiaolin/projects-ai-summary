@@ -9,6 +9,7 @@ on:
 
 jobs:
   apply-patch:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     environment: pl-search
     env:
@@ -80,6 +81,12 @@ jobs:
             echo "No changes detected in tracked files, skipping commit."
             echo "CHANGES_DETECTED=false" >> $GITHUB_ENV
           fi
+
+      - name: Rebase onto latest master
+        if: env.CHANGES_DETECTED == 'true'
+        run: |
+          git fetch origin master
+          git rebase origin/master
 
       - name: Push to repository
         if: env.CHANGES_DETECTED == 'true'

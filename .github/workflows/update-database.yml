@@ -85,6 +85,12 @@ jobs:
             echo "CHANGES_DETECTED=false" >> $GITHUB_ENV
           fi
 
+      - name: Rebase onto latest master
+        if: env.CHANGES_DETECTED == 'true'
+        run: |
+          git fetch origin master
+          git rebase origin/master
+
       - name: Push to repository
         if: env.CHANGES_DETECTED == 'true'
         uses: ad-m/github-push-action@master
