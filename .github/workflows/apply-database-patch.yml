@@ -1,10 +1,6 @@
 name: Apply Database Patch
 
 on:
-  push:
-    paths:
-      - 'home/database.patch.json'
-      - '.github/workflows/apply-database-patch.yml'
   workflow_dispatch:
 
 concurrency:
