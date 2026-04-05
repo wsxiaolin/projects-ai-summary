@@ -44,15 +44,23 @@ jobs:
         DB_PATH: ./data.db
       run: npm run update-db
 
-    - name: Set up Git
+    - name: Check for changes and commit if needed
       run: |
         git config --global user.name 'pl-bot[bot]'
         git config --global user.email 'noreply@github.com'
         git add data.db
-        git commit -m "chore: 自动更新作品数据库"
+        # Only commit if there are actual changes
+        if ! git diff --cached --quiet; then
+          git commit -m "chore: 自动更新作品数据库"
+          echo "CHANGES_DETECTED=true" >> $GITHUB_ENV
+        else
+          echo "No changes detected in data.db, skipping commit."
+          echo "CHANGES_DETECTED=false" >> $GITHUB_ENV
+        fi
 
     - name: Push to repository
       uses: ad-m/github-push-action@master
+      if: env.CHANGES_DETECTED == 'true'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         branch: master
