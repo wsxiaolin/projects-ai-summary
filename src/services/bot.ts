@@ -2,6 +2,7 @@
 import pl from 'plweb';
 import { config } from '../config';
 import { SearchFilters, searchRecords } from '../db/repository';
+import { expandKeywordsWithGroq } from './groqIntent';
 
 function parseNumber(value: string): number | undefined {
   const n = Number(value);
@@ -98,6 +99,67 @@ function helpMessage(): string {
   ].join('\n');
 }
 
+async function maybeExpandFilters(content: string, filters: SearchFilters): Promise<{ expanded: SearchFilters; extraKeywords: string[] }> {
+  const originalKeywords = filters.keywords?.map(x => x.trim()).filter(Boolean) ?? [];
+  if (originalKeywords.length === 0) {
+    return { expanded: filters, extraKeywords: [] };
+  }
+
+  const { extraKeywords } = await expandKeywordsWithGroq(content, originalKeywords);
+  if (extraKeywords.length === 0) {
+    return { expanded: filters, extraKeywords: [] };
+  }
+
+  return {
+    expanded: {
+      ...filters,
+      keywords: [...originalKeywords, ...extraKeywords].slice(0, 10),
+    },
+    extraKeywords,
+  };
+}
+
+async function processQueryMessage(content: string): Promise<string> {
+  const filters = parseQuery(content);
+  if (!filters) return helpMessage();
+
+  const { expanded, extraKeywords } = await maybeExpandFilters(content, filters);
+  const rows = await searchRecords(expanded);
+  if (rows.length === 0) {
+    return '未命中记录，请缩小条件或更换关键词。\n' + helpMessage();
+  }
+
+  // 构建查询信息摘要
+  let queryInfo = '【查询内容】\n';
+  if (filters.keywords && filters.keywords.length > 0) {
+    queryInfo += `关键词: ${filters.keywords.join(', ')}\n`;
+  }
+  if (extraKeywords.length > 0) {
+    queryInfo += `模糊扩展: ${extraKeywords.join(', ')}\n`;
+  }
+  if (filters.author) {
+    queryInfo += `作者: ${filters.author}\n`;
+  }
+  if (filters.year) {
+    queryInfo += `年份: ${filters.year}\n`;
+  }
+  if (filters.yearFrom || filters.yearTo) {
+    queryInfo += `年份范围: ${filters.yearFrom ?? '不限'} - ${filters.yearTo ?? '不限'}\n`;
+  }
+  queryInfo += `\n【查询结果】(共${rows.length}条)\n`;
+
+  // 构建结果列表，包含摘要和关键词
+  const lines = rows.map((x) => {
+    const keywords = x.keyWords ? JSON.parse(x.keyWords).slice(0, 3).join(', ') : '';
+    const summary = x.summary ? x.summary.substring(0, 100) : '';
+    return `<discussion=${x.id}>${x.name}</discussion> | ${x.userName} | ${x.year}
+        📝 摘要: ${summary}${summary.length >= 50 ? '...' : ''}
+        🔑 关键词: ${keywords}`;
+  });
+
+  return `<size=28>${queryInfo}${lines.join('\n\n')}</size>`;
+}
+
 export async function runDiscussionBot(): Promise<void> {
   const bot = new pl.Bot(
     config.plUsername,
@@ -105,40 +167,7 @@ export async function runDiscussionBot(): Promise<void> {
     // processFn：处理消息的函数
     async (msg: { Content: string }) => {
       try {
-        const filters = parseQuery(msg.Content);
-        if (!filters) return helpMessage();
-
-        const rows = await searchRecords(filters);
-        if (rows.length === 0) {
-          return '未命中记录，请缩小条件或更换关键词。\n' + helpMessage();
-        }
-
-        // 构建查询信息摘要
-        let queryInfo = '【查询内容】\n';
-        if (filters.keywords && filters.keywords.length > 0) {
-          queryInfo += `关键词: ${filters.keywords.join(', ')}\n`;
-        }
-        if (filters.author) {
-          queryInfo += `作者: ${filters.author}\n`;
-        }
-        if (filters.year) {
-          queryInfo += `年份: ${filters.year}\n`;
-        }
-        if (filters.yearFrom || filters.yearTo) {
-          queryInfo += `年份范围: ${filters.yearFrom ?? '不限'} - ${filters.yearTo ?? '不限'}\n`;
-        }
-        queryInfo += `\n【查询结果】(共${rows.length}条)\n`;
-
-        // 构建结果列表，包含摘要和关键词
-        const lines = rows.map((x) => {
-          const keywords = x.keyWords ? JSON.parse(x.keyWords).slice(0, 3).join(', ') : '';
-          const summary = x.summary ? x.summary.substring(0, 100) : '';
-          return `<discussion=${x.id}>${x.name}</discussion> | ${x.userName} | ${x.year}
-        📝 摘要: ${summary}${summary.length >= 50 ? '...' : ''}
-        🔑 关键词: ${keywords}`;
-        });
-
-        return `<size=28>${queryInfo}${lines.join('\n\n')}</size>`;
+        return await processQueryMessage(msg.Content);
       } catch (error) {
         console.error('[Bot] 查询处理失败:', error instanceof Error ? error.message : String(error));
         return '处理查询时出错，请稍后重试。';
@@ -198,40 +227,7 @@ export async function runDiscussionBotOnce(): Promise<void> {
     // processFn：处理消息的函数
     async (msg: { Content: string }) => {
       try {
-        const filters = parseQuery(msg.Content);
-        if (!filters) return helpMessage();
-
-        const rows = await searchRecords(filters);
-        if (rows.length === 0) {
-          return '未命中记录，请缩小条件或更换关键词。\n' + helpMessage();
-        }
-
-        // 构建查询信息摘要
-        let queryInfo = '【查询内容】\n';
-        if (filters.keywords && filters.keywords.length > 0) {
-          queryInfo += `关键词: ${filters.keywords.join(', ')}\n`;
-        }
-        if (filters.author) {
-          queryInfo += `作者: ${filters.author}\n`;
-        }
-        if (filters.year) {
-          queryInfo += `年份: ${filters.year}\n`;
-        }
-        if (filters.yearFrom || filters.yearTo) {
-          queryInfo += `年份范围: ${filters.yearFrom ?? '不限'} - ${filters.yearTo ?? '不限'}\n`;
-        }
-        queryInfo += `\n【查询结果】(共${rows.length}条)\n`;
-
-        // 构建结果列表，包含摘要和关键词
-        const lines = rows.map((x) => {
-          const keywords = x.keyWords ? JSON.parse(x.keyWords).slice(0, 3).join(', ') : '';
-          const summary = x.summary ? x.summary.substring(0, 100) : '';
-          return `<discussion=${x.id}>${x.name}</discussion> | ${x.userName} | ${x.year}
-        📝 摘要: ${summary}${summary.length >= 50 ? '...' : ''}
-        🔑 关键词: ${keywords}`;
-        });
-
-        return `<size=28>${queryInfo}${lines.join('\n\n')}</size>`;
+        return await processQueryMessage(msg.Content);
       } catch (error) {
         console.error('[Bot] 查询处理失败:', error instanceof Error ? error.message : String(error));
         return '处理查询时出错，请稍后重试。';

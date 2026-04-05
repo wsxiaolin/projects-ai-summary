@@ -1,6 +1,6 @@
 # Physics-Lab-Search-Engine
 
-基于 `physics-lab-web-api` + SQLite + OpenAI/讯飞星火 的作品收录与查询机器人。
+基于 `physics-lab-web-api` + SQLite + OpenAI/讯飞星火/Groq 的作品收录与查询机器人。
 
 ## Bot 查询命令
 
@@ -48,6 +48,11 @@ OPENAI_MODEL=gpt-4o-mini
 SPARK_API_PASSWORD=your_password
 SPARK_MODEL=generalv3.5
 SPARK_ENDPOINT=https://spark-api-open.xf-yun.com/v1/chat/completions
+
+# 用于 bot 查询时的关键词模糊扩展
+GROQ_API_KEY=your_groq_key
+GROQ_MODEL=llama-3.1-8b-instant
+# GROQ_BASE_URL=https://api.groq.com/openai/v1
 ```
 
 ## GitHub Actions 工作流

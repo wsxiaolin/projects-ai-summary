@@ -22,6 +22,8 @@ function readEnvList(name: string, fallback: string): string[] {
 const openaiApiKey = readEnv('OPENAI_API_KEY');
 const sparkApiPassword = readEnv('SPARK_API_PASSWORD');
 
+const groqApiKey = readEnv('GROQ_API_KEY');
+
 export const config = {
   databasePath: readEnvWithDefault('DB_PATH', './data.db'),
   plUsername: readEnvWithDefault('PL_USERNAME', ''),
@@ -54,6 +56,12 @@ export const config = {
   
   // 提供商判断（自动）
   provider: openaiApiKey ? 'openai' : 'spark',
+
+
+  // Groq（用于查询词模糊扩展，默认免费模型）
+  groqApiKey: groqApiKey ?? '',
+  groqModel: readEnvWithDefault('GROQ_MODEL', 'llama-3.1-8b-instant'),
+  groqBaseUrl: readEnvWithDefault('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
 
   // 向后兼容（保留旧参数访问）
   get discussionTag() { return this.discussionTags[0]; },
