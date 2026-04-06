@@ -1,6 +1,7 @@
 import { createUser } from '../pl/client';
 import { analyzeContent, analyzeContentWithModel } from './analyse';
 import { insertOne, queryById } from '../db/repository';
+import { config } from '../config';
 import { DataRecord } from '../types/data';
 
 // 并发控制器：限制最多并发 N 个操作
@@ -32,7 +33,7 @@ async function runWithConcurrency<T>(
   return results;
 }
 
-function toRecord(project: any, summary: any, llm: any): DataRecord {
+function toRecord(project: any, summary: any, llm: any, taggingModel: string): DataRecord {
   return {
     id: project.ID,
     name: project.Subject,
@@ -46,7 +47,8 @@ function toRecord(project: any, summary: any, llm: any): DataRecord {
     primaryDiscipline: JSON.stringify(llm.Subject1),
     secondaryDiscipline: JSON.stringify(llm.Subject2),
     keyWords: JSON.stringify(llm.keywords),
-    readability: llm.readability
+    readability: llm.readability,
+    taggingModel,
   };
 }
 
@@ -68,6 +70,7 @@ export async function collectByTagWithOptions(
   take: number = -100
 ): Promise<{ inserted: number; skipped: number }> {
   const user = await createUser();
+  const resolvedModel = model ?? config.model;
   
   // 自动分页获取数据（plweb API需要用负数绕过单次返回限制）
   let allItems: any[] = [];
@@ -164,7 +167,7 @@ export async function collectByTagWithOptions(
           continue;
         }
         
-        const record = toRecord(result.item, result.summary, result.llm);
+        const record = toRecord(result.item, result.summary, result.llm, resolvedModel);
         insertTasks.push(async () => {
           await insertOne(record);
           console.log('[DB] 成功写入:', record.id);
@@ -274,7 +277,8 @@ export async function backfillByDiscussionIds(ids: string[]): Promise<{ inserted
           primaryDiscipline: JSON.stringify(result.llm.Subject1),
           secondaryDiscipline: JSON.stringify(result.llm.Subject2),
           keyWords: JSON.stringify(result.llm.keywords),
-          readability: result.llm.readability
+          readability: result.llm.readability,
+          taggingModel: config.model,
         };
 
         insertTasks.push(async () => {

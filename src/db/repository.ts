@@ -25,6 +25,7 @@ function toRecordParams(record: DataRecord): Array<string | number> {
     record.secondaryDiscipline,
     record.keyWords,
     record.readability,
+    record.taggingModel,
   ];
 }
 
@@ -43,9 +44,24 @@ export async function initTable(): Promise<void> {
       primaryDiscipline TEXT,
       secondaryDiscipline TEXT,
       keyWords TEXT,
-      readability REAL
+      readability REAL,
+      taggingModel TEXT
     );
   `);
+
+  const columns = await all<{ name: string }>('PRAGMA table_info(data)');
+  const hasTaggingModel = columns.some((column) => column.name === 'taggingModel');
+
+  if (!hasTaggingModel) {
+    await run('ALTER TABLE data ADD COLUMN taggingModel TEXT');
+  }
+
+  await run(
+    `UPDATE data
+     SET taggingModel = ?
+     WHERE taggingModel IS NULL OR TRIM(taggingModel) = ''`,
+    ['spark 3.5 max'],
+  );
 }
 
 export async function queryById(id: string): Promise<DataRecord[]> {
@@ -72,8 +88,8 @@ export async function insertOne(data: DataRecord): Promise<void> {
   await run(
     `INSERT INTO data (
       id, name, contentLength, userID, userName, editorID, editorName,
-      year, summary, primaryDiscipline, secondaryDiscipline, keyWords, readability
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      year, summary, primaryDiscipline, secondaryDiscipline, keyWords, readability, taggingModel
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     toRecordParams(data)
   );
 }
@@ -82,8 +98,8 @@ export async function upsertOne(data: DataRecord): Promise<void> {
   await run(
     `INSERT OR REPLACE INTO data (
       id, name, contentLength, userID, userName, editorID, editorName,
-      year, summary, primaryDiscipline, secondaryDiscipline, keyWords, readability
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      year, summary, primaryDiscipline, secondaryDiscipline, keyWords, readability, taggingModel
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     toRecordParams(data),
   );
 }

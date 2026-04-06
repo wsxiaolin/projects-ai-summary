@@ -12,6 +12,7 @@ export interface DataRecord {
   secondaryDiscipline: string;
   keyWords: string;
   readability: number;
+  taggingModel: string;
 }
 
 export interface LLMResult {

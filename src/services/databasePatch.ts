@@ -19,6 +19,7 @@ export interface AdminRecord {
   secondaryDiscipline: string[];
   keyWords: string[];
   readability: number;
+  taggingModel: string;
 }
 
 export interface DatabasePatchOperation {
@@ -49,6 +50,7 @@ const RECORD_FIELDS: Array<keyof DataRecord> = [
   'secondaryDiscipline',
   'keyWords',
   'readability',
+  'taggingModel',
 ];
 
 function parseArrayField(value: unknown): string[] {
@@ -100,6 +102,7 @@ export function serializeRecordForAdmin(record: DataRecord): AdminRecord {
     secondaryDiscipline: parseArrayField(record.secondaryDiscipline),
     keyWords: parseArrayField(record.keyWords),
     readability: record.readability,
+    taggingModel: record.taggingModel,
   };
 }
 
@@ -118,6 +121,7 @@ export function coerceAdminRecord(input: Record<string, unknown>): DataRecord {
     secondaryDiscipline: stringifyArrayField(input.secondaryDiscipline),
     keyWords: stringifyArrayField(input.keyWords),
     readability: toNumber(input.readability, 0),
+    taggingModel: String(input.taggingModel ?? '').trim(),
   };
 }
 

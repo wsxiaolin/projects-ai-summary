@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -240,7 +240,7 @@
       <section class="hero">
         <p class="meta" id="metaLine">Loading sql.js...</p>
         <h1>Static Database Patch Console</h1>
-        <p>纯静态页面，浏览器直接读取 `data.db`，前端查询、编辑并生成可复制的补丁。</p>
+        <p>绾潤鎬侀〉闈紝娴忚鍣ㄧ洿鎺ヨ鍙?`data.db`锛屽墠绔煡璇€佺紪杈戝苟鐢熸垚鍙鍒剁殑琛ヤ竵銆?/p>
       </section>
 
       <div class="layout">
@@ -248,50 +248,50 @@
           <h2 class="section-title">Data Source</h2>
           <div class="search-grid">
             <div class="field full">
-              <label for="dbUrl">数据库 URL</label>
+              <label for="dbUrl">鏁版嵁搴?URL</label>
               <input id="dbUrl" value="./data.db" />
             </div>
             <div class="field full">
-              <label for="dbFile">或上传本地 data.db</label>
+              <label for="dbFile">鎴栦笂浼犳湰鍦?data.db</label>
               <input id="dbFile" type="file" accept=".db,.sqlite,.sqlite3,application/octet-stream" />
             </div>
           </div>
           <div class="toolbar">
-            <button class="primary" id="loadRemoteBtn">加载远程数据库</button>
-            <button id="loadLocalBtn">加载本地数据库</button>
+            <button class="primary" id="loadRemoteBtn">鍔犺浇杩滅▼鏁版嵁搴?/button>
+            <button id="loadLocalBtn">鍔犺浇鏈湴鏁版嵁搴?/button>
           </div>
           <div class="status" id="loadStatus"></div>
 
           <h2 class="section-title" style="margin-top: 24px">Search</h2>
           <div class="search-grid">
             <div class="field full">
-              <label for="keywords">关键词</label>
-              <input id="keywords" placeholder="例如：电磁学 光学" />
+              <label for="keywords">鍏抽敭璇?/label>
+              <input id="keywords" placeholder="渚嬪锛氱數纾佸 鍏夊" />
             </div>
             <div class="field">
-              <label for="author">作者</label>
+              <label for="author">浣滆€?/label>
               <input id="author" />
             </div>
             <div class="field">
-              <label for="limit">限制</label>
+              <label for="limit">闄愬埗</label>
               <input id="limit" type="number" value="20" />
             </div>
             <div class="field">
-              <label for="year">年份</label>
+              <label for="year">骞翠唤</label>
               <input id="year" type="number" />
             </div>
             <div class="field">
-              <label for="yearFrom">年份起</label>
+              <label for="yearFrom">骞翠唤璧?/label>
               <input id="yearFrom" type="number" />
             </div>
             <div class="field">
-              <label for="yearTo">年份止</label>
+              <label for="yearTo">骞翠唤姝?/label>
               <input id="yearTo" type="number" />
             </div>
           </div>
           <div class="toolbar">
-            <button class="primary" id="searchBtn">查询</button>
-            <button id="recentBtn">最近记录</button>
+            <button class="primary" id="searchBtn">鏌ヨ</button>
+            <button id="recentBtn">鏈€杩戣褰?/button>
           </div>
           <div class="status" id="searchStatus"></div>
 
@@ -300,9 +300,9 @@
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>标题</th>
-                  <th>作者</th>
-                  <th>年份</th>
+                  <th>鏍囬</th>
+                  <th>浣滆€?/th>
+                  <th>骞翠唤</th>
                 </tr>
               </thead>
               <tbody id="resultBody"></tbody>
@@ -318,58 +318,62 @@
               <input id="recordId" />
             </div>
             <div class="field full">
-              <label for="name">标题</label>
+              <label for="name">鏍囬</label>
               <input id="name" />
             </div>
             <div class="field">
-              <label for="contentLength">内容长度</label>
+              <label for="contentLength">鍐呭闀垮害</label>
               <input id="contentLength" type="number" />
             </div>
             <div class="field">
-              <label for="yearEdit">年份</label>
+              <label for="yearEdit">骞翠唤</label>
               <input id="yearEdit" type="number" />
             </div>
             <div class="field">
-              <label for="userID">作者 ID</label>
+              <label for="userID">浣滆€?ID</label>
               <input id="userID" />
             </div>
             <div class="field">
-              <label for="userName">作者名</label>
+              <label for="userName">浣滆€呭悕</label>
               <input id="userName" />
             </div>
             <div class="field">
-              <label for="editorID">编辑者 ID</label>
+              <label for="editorID">缂栬緫鑰?ID</label>
               <input id="editorID" />
             </div>
             <div class="field">
-              <label for="editorName">编辑者名</label>
+              <label for="editorName">缂栬緫鑰呭悕</label>
               <input id="editorName" />
             </div>
             <div class="field">
-              <label for="readability">可读性</label>
+              <label for="readability">鍙鎬?/label>
               <input id="readability" type="number" step="0.01" min="0" max="1" />
             </div>
+            <div class="field">
+              <label for="taggingModel">打标签模型</label>
+              <input id="taggingModel" />
+            </div>
             <div class="field full">
-              <label for="summary">摘要</label>
+              <label for="summary">鎽樿</label>
               <textarea id="summary"></textarea>
             </div>
             <div class="field full">
-              <label for="primaryDiscipline">一级学科</label>
-              <textarea id="primaryDiscipline" placeholder="一行一个，或逗号分隔"></textarea>
+              <label for="primaryDiscipline">涓€绾у绉?/label>
+              <textarea id="primaryDiscipline" placeholder="涓€琛屼竴涓紝鎴栭€楀彿鍒嗛殧"></textarea>
             </div>
             <div class="field full">
-              <label for="secondaryDiscipline">二级学科</label>
-              <textarea id="secondaryDiscipline" placeholder="一行一个，或逗号分隔"></textarea>
+              <label for="secondaryDiscipline">浜岀骇瀛︾</label>
+              <textarea id="secondaryDiscipline" placeholder="涓€琛屼竴涓紝鎴栭€楀彿鍒嗛殧"></textarea>
             </div>
             <div class="field full">
-              <label for="keyWords">关键词</label>
-              <textarea id="keyWords" placeholder="一行一个，或逗号分隔"></textarea>
+              <label for="keyWords">鍏抽敭璇?/label>
+              <textarea id="keyWords" placeholder="涓€琛屼竴涓紝鎴栭€楀彿鍒嗛殧"></textarea>
             </div>
           </div>
           <div class="toolbar">
-            <button id="newItemBtn">新增条目</button>
-            <button class="primary" id="generatePatchBtn">生成补丁</button>
-            <button id="resetBtn">重置表单</button>
+            <button id="newItemBtn">鏂板鏉＄洰</button>
+            <button class="primary" id="generatePatchBtn">鐢熸垚琛ヤ竵</button>
+            <button id="resetBtn">閲嶇疆琛ㄥ崟</button>
           </div>
           <div class="status" id="editStatus"></div>
         </section>
@@ -377,9 +381,9 @@
 
       <section class="panel">
         <h2 class="section-title">Patch</h2>
-        <p class="card-note">补丁目标文件：`home/database.patch.json`。这个静态页不会直接写文件，只负责生成并复制补丁文本。</p>
+        <p class="card-note">琛ヤ竵鐩爣鏂囦欢锛歚home/database.patch.json`銆傝繖涓潤鎬侀〉涓嶄細鐩存帴鍐欐枃浠讹紝鍙礋璐ｇ敓鎴愬苟澶嶅埗琛ヤ竵鏂囨湰銆?/p>
         <div class="toolbar" style="margin-bottom: 14px">
-          <button class="secondary" id="copyPatchBtn">复制补丁</button>
+          <button class="secondary" id="copyPatchBtn">澶嶅埗琛ヤ竵</button>
         </div>
         <div class="status" id="patchStatus"></div>
         <pre class="patch-box" id="patchPreview">{
@@ -427,6 +431,7 @@
         "secondaryDiscipline",
         "keyWords",
         "readability",
+        "taggingModel",
       ];
 
       const recordFields = [
@@ -443,6 +448,7 @@
         "secondaryDiscipline",
         "keyWords",
         "readability",
+        "taggingModel",
       ];
 
       function setStatus(target, message, isError = false) {
@@ -466,7 +472,7 @@
           }
         } catch {
           return trimmed
-            .split(/[\n,，；;|]/)
+            .split(/[\n,锛岋紱;|]/)
             .map((item) => item.trim())
             .filter(Boolean);
         }
@@ -489,6 +495,7 @@
           secondaryDiscipline: parseArrayField(record.secondaryDiscipline),
           keyWords: parseArrayField(record.keyWords),
           readability: Number(record.readability || 0),
+          taggingModel: String(record.taggingModel || "").trim(),
         };
       }
 
@@ -507,6 +514,7 @@
           secondaryDiscipline: JSON.stringify(record.secondaryDiscipline),
           keyWords: JSON.stringify(record.keyWords),
           readability: record.readability,
+          taggingModel: record.taggingModel,
         };
       }
 
@@ -524,7 +532,7 @@
 
       function textareaValue(id) {
         return document.getElementById(id).value
-          .split(/[\n,，；;|]/)
+          .split(/[\n,锛岋紱;|]/)
           .map((item) => item.trim())
           .filter(Boolean);
       }
@@ -544,6 +552,7 @@
           secondaryDiscipline: textareaValue("secondaryDiscipline"),
           keyWords: textareaValue("keyWords"),
           readability: document.getElementById("readability").value,
+          taggingModel: document.getElementById("taggingModel").value,
         });
       }
 
@@ -563,7 +572,8 @@
         document.getElementById("secondaryDiscipline").value = (record.secondaryDiscipline || []).join("\n");
         document.getElementById("keyWords").value = (record.keyWords || []).join("\n");
         document.getElementById("readability").value = record.readability ?? 0;
-        setStatus(ids.editStatus, `已载入记录 ${record.id}`);
+        document.getElementById("taggingModel").value = record.taggingModel || "";
+        setStatus(ids.editStatus, `宸茶浇鍏ヨ褰?${record.id}`);
       }
 
       function startNewItem() {
@@ -571,12 +581,12 @@
         state.isCreating = true;
         state.selectedId = "";
         document.getElementById("recordId").focus();
-        setStatus(ids.editStatus, "已进入新增模式，请填写新记录并输入唯一 ID");
+        setStatus(ids.editStatus, "宸茶繘鍏ユ柊澧炴ā寮忥紝璇峰～鍐欐柊璁板綍骞惰緭鍏ュ敮涓€ ID");
       }
 
       function tokenizeKeywords(value) {
         return String(value || "")
-          .split(/[,\s|，；;]+/)
+          .split(/[,\s|锛岋紱;]+/)
           .map((item) => item.trim())
           .filter(Boolean);
       }
@@ -621,7 +631,7 @@
 
       function runSearch(mode) {
         if (!state.records.length) {
-          setStatus(ids.searchStatus, "请先加载数据库", true);
+          setStatus(ids.searchStatus, "璇峰厛鍔犺浇鏁版嵁搴?, true);
           return;
         }
 
@@ -678,7 +688,7 @@
 
         const sliced = records.slice(0, limit);
         renderResults(sliced);
-        setStatus(ids.searchStatus, `已显示 ${sliced.length} / ${records.length} 条记录`);
+        setStatus(ids.searchStatus, `宸叉樉绀?${sliced.length} / ${records.length} 鏉¤褰昤);
       }
 
       async function loadSqlJs() {
@@ -697,7 +707,7 @@
 
         const result = state.db.exec(`
           SELECT id, name, contentLength, userID, userName, editorID, editorName,
-                 year, summary, primaryDiscipline, secondaryDiscipline, keyWords, readability
+                 year, summary, primaryDiscipline, secondaryDiscipline, keyWords, readability, taggingModel
           FROM data
         `);
 
@@ -710,16 +720,16 @@
         state.originalById = new Map(rows.map((record) => [record.id, toPatchRecord(record)]));
 
         ids.metaLine.textContent = `Source: ${sourceLabel} | Records: ${rows.length}`;
-        setStatus(ids.loadStatus, `数据库已加载，共 ${rows.length} 条记录`);
+        setStatus(ids.loadStatus, `鏁版嵁搴撳凡鍔犺浇锛屽叡 ${rows.length} 鏉¤褰昤);
         runSearch("recent");
       }
 
       async function loadRemoteDatabase() {
-        setStatus(ids.loadStatus, "正在加载远程数据库...");
+        setStatus(ids.loadStatus, "姝ｅ湪鍔犺浇杩滅▼鏁版嵁搴?..");
         const url = document.getElementById("dbUrl").value.trim() || "./data.db";
         const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) {
-          throw new Error(`无法加载数据库: ${response.status} ${response.statusText}`);
+          throw new Error(`鏃犳硶鍔犺浇鏁版嵁搴? ${response.status} ${response.statusText}`);
         }
         const bytes = await response.arrayBuffer();
         importDatabase(bytes, url);
@@ -728,9 +738,9 @@
       async function loadLocalDatabase() {
         const file = document.getElementById("dbFile").files[0];
         if (!file) {
-          throw new Error("请先选择本地数据库文件");
+          throw new Error("璇峰厛閫夋嫨鏈湴鏁版嵁搴撴枃浠?);
         }
-        setStatus(ids.loadStatus, "正在读取本地数据库...");
+        setStatus(ids.loadStatus, "姝ｅ湪璇诲彇鏈湴鏁版嵁搴?..");
         const bytes = await file.arrayBuffer();
         importDatabase(bytes, file.name);
       }
@@ -738,7 +748,7 @@
       function generatePatch() {
         const record = collectRecord();
         if (!record.id) {
-          setStatus(ids.editStatus, "请输入记录 ID", true);
+          setStatus(ids.editStatus, "璇疯緭鍏ヨ褰?ID", true);
           return;
         }
 
@@ -764,19 +774,19 @@
         );
         setStatus(
           ids.patchStatus,
-          current ? `已生成 ${record.id} 的更新补丁` : `已生成 ${record.id} 的新增补丁`,
+          current ? `宸茬敓鎴?${record.id} 鐨勬洿鏂拌ˉ涓乣 : `宸茬敓鎴?${record.id} 鐨勬柊澧炶ˉ涓乣,
         );
       }
 
       async function copyPatch() {
         const text = ids.patchPreview.textContent || "";
         if (!text.trim()) {
-          setStatus(ids.patchStatus, "没有可复制的补丁", true);
+          setStatus(ids.patchStatus, "娌℃湁鍙鍒剁殑琛ヤ竵", true);
           return;
         }
 
         await navigator.clipboard.writeText(text);
-        setStatus(ids.patchStatus, "补丁已复制到剪贴板");
+        setStatus(ids.patchStatus, "琛ヤ竵宸插鍒跺埌鍓创鏉?);
       }
 
       function resetForm() {
@@ -785,7 +795,7 @@
         }
         state.selectedId = "";
         state.isCreating = false;
-        setStatus(ids.editStatus, "表单已重置");
+        setStatus(ids.editStatus, "琛ㄥ崟宸查噸缃?);
       }
 
       document.getElementById("loadRemoteBtn").addEventListener("click", () => {
@@ -818,3 +828,5 @@
     </script>
   </body>
 </html>
+
+
