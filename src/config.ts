@@ -73,7 +73,7 @@ export const config = {
   groqApiKey: groqApiKey ?? '',
   groqModel: readEnvWithDefault('GROQ_MODEL', 'llama-3.1-8b-instant'),
   groqBaseUrl: readEnvWithDefault('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
-  groqChatModel: readEnv('GROQ_CHAT_MODEL') ?? readEnvWithDefault('GROQ_MODEL', 'openai/gpt-oss-120b'),
+  groqChatModel: readEnv('GROQ_CHAT_MODEL') ?? 'openai/gpt-oss-120b',
   groqChatMaxTokens: readEnvInt('GROQ_CHAT_MAX_TOKENS', 120),
   logDirectory: readEnvWithDefault('LOG_DIR', './logs'),
   logSummaryId: readEnvWithDefault('PL_LOG_SUMMARY_ID', ''),

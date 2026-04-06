@@ -48,8 +48,10 @@ function safeJsonParse(content: string): QueryExpansionResult | null {
 
 interface GroqChatCompletionResponse {
   choices?: Array<{
+    finish_reason?: string | null;
     message?: {
       content?: string | null;
+      reasoning?: string | null;
     };
   }>;
   error?: {
@@ -275,12 +277,13 @@ export async function chatBrieflyWithGroq(input: string): Promise<string | null>
       {
         model: config.groqChatModel,
         temperature: 0.5,
+        include_reasoning: false,
         max_tokens: config.groqChatMaxTokens,
         messages: [
           {
             role: "system",
             content:
-              "你现在只是简短接话，不要伪造数据库结果，不要长篇解释，不超过两句话，尽量控制在60个中文字符内。",
+              "你要尽可能满足用户的需求",
           },
           {
             role: "user",
@@ -298,7 +301,16 @@ export async function chatBrieflyWithGroq(input: string): Promise<string | null>
       },
     );
 
-    const content = (resp.data.choices?.[0]?.message?.content ?? "").trim();
+    const choice = resp.data.choices?.[0];
+    const message = choice?.message;
+    const content = (message?.content ?? message?.reasoning ?? "").trim();
+
+    if (!content) {
+      console.warn(
+        `[Groq] fallback chat returned empty content. model=${config.groqChatModel}, finish_reason=${choice?.finish_reason ?? "unknown"}`,
+      );
+    }
+
     logGroqResponse(`Groq fallback-chat model=${config.groqChatModel}`, content);
     return content || null;
   } catch (error) {
