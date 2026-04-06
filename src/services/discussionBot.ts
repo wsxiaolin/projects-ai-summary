@@ -172,7 +172,7 @@ async function buildNoMatchMessage(
 ): Promise<string> {
   const lines = ['没查到数据库里的匹配记录。', ...buildQuerySummary(filters, extraKeywords), '', helpMessage()];
   const chat = await chatBrieflyWithGroq(content);
-
+  console.log('[Bot] Groq chat response:', chat);
   if (chat) {
     lines.push('', `顺便聊一句: ${chat}`);
   }
