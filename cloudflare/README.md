@@ -1,71 +1,35 @@
-# Cloudflare Query API
+﻿# Cloudflare Query API
 
 这个目录提供一个可直接部署到 Cloudflare Workers 的只读查询 API。
 
 ## 文件
 
 - `worker.mjs`：Workers 入口，提供 `/api/meta`、`/api/search`、`/api/record`
-- `data/records.mjs`：由本地数据库导出的静态数据快照
+- `data/records.mjs`：由本地数据库导出的静态快照
 - `wrangler.toml`：Workers 配置
 
-## 部署前准备
-
-1. 本地先生成最新快照：
+## 部署准备
 
 ```bash
 npm run build
 npm run export-cloudflare
-```
-
-2. 登录 Cloudflare：
-
-```bash
 npx wrangler login
-```
-
-3. 部署：
-
-```bash
 npx wrangler deploy --config cloudflare/wrangler.toml
 ```
 
+要给Worker配置secret`GROQ_API_KEY`,其余可选变量：
+
+- `GROQ_BASE_URL`，默认 `https://api.groq.com/openai/v1`
+- `GROQ_KEYWORD_MODEL`，默认 `llama-3.1-8b-instant`
+- `GROQ_MODEL`，如果没单独配 `GROQ_KEYWORD_MODEL`，会回退用它
+
+如果没有配置 `GROQ_API_KEY`，API 仍可正常使用，只是不会做 AI 扩词。
+
+
 ## API
 
-### `GET /api/meta`
+- `GET /api/meta`：返回服务信息、快照生成时间、总记录数、单次最大返回条数，以及当前是否启用了 AI 扩词。
 
-返回服务信息、记录数量、快照生成时间。
+- `GET /api/search`: 支持参数：keywords, author, year, yearFrom, yearTo, limit, aiExpand
 
-### `GET /api/search`
-
-查询参数：
-
-- `keywords`
-- `author`
-- `year`
-- `yearFrom`
-- `yearTo`
-- `limit`
-
-示例：
-
-```text
-/api/search?keywords=电磁学 光学&limit=10
-```
-
-### `GET /api/record?id=...`
-
-按作品 ID 获取单条记录。
-
-
-## GitHub Actions 自动部署
-
-如果要让 `.github/workflows/update-database.yml` 自动部署 Cloudflare Worker，请在 GitHub Secrets 里配置：
-
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-
-工作流会在导出快照后，进入 `cloudflare/` 目录执行：
-
-```bash
-npx wrangler deploy --config wrangler.toml
-```
+- `GET /api/record?id=...`: 返回单条记录。
