@@ -1,4 +1,4 @@
-name: 获取来自物实的物实查询请求
+name: Run Bot Query
 
 on:
   schedule:
