@@ -16,6 +16,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git checkout main
+          git pull --ff-only origin main
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -91,7 +98,4 @@ jobs:
 
       - name: Push to repository
         if: env.CHANGES_DETECTED == 'true'
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: master
+        run: git push origin HEAD:main
