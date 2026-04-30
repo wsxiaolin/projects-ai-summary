@@ -108,9 +108,9 @@ export async function collectByTagWithOptions(
   let skipped = 0;
   
   const items = allItems;
-  const batchSize = 10;
+  const batchSize = 100;
 
-  // 分批处理：每批10个作品
+  // 分批处理：每批100个作品
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
     const batchNum = Math.floor(i / batchSize) + 1;
