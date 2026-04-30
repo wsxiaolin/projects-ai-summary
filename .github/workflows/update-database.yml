@@ -55,6 +55,7 @@ jobs:
           PL_DISCUSSION_TYPE: ${{ secrets.PL_DISCUSSION_TYPE }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           SPARK_API_PASSWORD: ${{ secrets.SPARK_API_PASSWORD }}
           SPARK_MODEL: ${{ secrets.SPARK_MODEL }}
           SPARK_ENDPOINT: ${{ secrets.SPARK_ENDPOINT }}
