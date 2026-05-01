@@ -9,27 +9,26 @@ async function runWithConcurrency<T>(
   tasks: (() => Promise<T>)[],
   concurrencyLimit: number
 ): Promise<T[]> {
-  const results: T[] = [];
-  const executing: Promise<T>[] = [];
+  if (tasks.length === 0) return [];
 
-  for (const [index, task] of tasks.entries()) {
-    const promise = task().then((result) => {
-      results[index] = result;
-      return result;
-    });
+  const limit = Math.max(1, Math.floor(concurrencyLimit));
+  const results = new Array<T>(tasks.length);
+  let nextIndex = 0;
 
-    executing.push(promise);
-
-    if (executing.length >= concurrencyLimit) {
-      await Promise.race(executing);
-      executing.splice(
-        executing.findIndex((p) => p === promise),
-        1
-      );
+  async function worker(): Promise<void> {
+    while (nextIndex < tasks.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await tasks[index]();
     }
   }
 
-  await Promise.all(executing);
+  const workers = Array.from(
+    { length: Math.min(limit, tasks.length) },
+    () => worker()
+  );
+
+  await Promise.all(workers);
   return results;
 }
 
@@ -71,11 +70,14 @@ export async function collectByTagWithOptions(
 ): Promise<{ inserted: number; skipped: number }> {
   const user = await createUser();
   const resolvedModel = model ?? config.model;
+  console.log(
+    `[collectByTagWithOptions] 参数: pageSize=${config.collectPageSize}, batchSize=${config.collectBatchSize}, analyzeConcurrency=${config.collectAnalyzeConcurrency}, insertConcurrency=${config.collectInsertConcurrency}, pageDelayMs=${config.collectPageDelayMs}, batchDelayMs=${config.collectBatchDelayMs}`
+  );
   
   // 自动分页获取数据（plweb API需要用负数绕过单次返回限制）
   let allItems: any[] = [];
   const takeAbsolute = Math.abs(take);
-  const singlePageSize = 100; // 单次请求最多100条（用负数绕过）
+  const singlePageSize = config.collectPageSize;
   
   let currentSkip = skip;
   let remaining = takeAbsolute;
@@ -86,7 +88,20 @@ export async function collectByTagWithOptions(
     const takeValue = -currentTake;
     console.log(`[collectByTagWithOptions] 分页获取: skip=${currentSkip}, take=${takeValue}`);
     
-    const list = await user.projects.query(discussionType, { tags: [tag], take: takeValue, skip: currentSkip });
+    let list;
+    try {
+      list = await user.projects.query(discussionType, { tags: [tag], take: takeValue, skip: currentSkip });
+    } catch (error) {
+      console.error(`[collectByTagWithOptions] 分页获取失败，跳过: skip=${currentSkip}, take=${takeValue}`, error instanceof Error ? error.message : String(error));
+      // 如果是第一次尝试就失败，或者已经是最后一批，则跳出循环
+      if (currentSkip === skip || remaining <= singlePageSize) {
+        break;
+      }
+      // 否则继续下一批
+      currentSkip += singlePageSize;
+      continue;
+    }
+    
     const items = list.Data.$values ?? [];
     
     if (items.length === 0) {
@@ -99,8 +114,8 @@ export async function collectByTagWithOptions(
     currentSkip += items.length;
     
     // 分页间延迟，避免频繁请求
-    if (remaining > 0) {
-      await new Promise((r) => setTimeout(r, 500));
+    if (remaining > 0 && config.collectPageDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, config.collectPageDelayMs));
     }
   }
   
@@ -108,9 +123,9 @@ export async function collectByTagWithOptions(
   let skipped = 0;
   
   const items = allItems;
-  const batchSize = 100;
+  const batchSize = config.collectBatchSize;
 
-  // 分批处理：每批100个作品
+  // 分批处理作品，批大小由配置控制
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
     const batchNum = Math.floor(i / batchSize) + 1;
@@ -129,7 +144,15 @@ export async function collectByTagWithOptions(
         continue;
       }
 
-      const summary = await user.projects.getSummary(item.ID, discussionType);
+      let summary;
+      try {
+        summary = await user.projects.getSummary(item.ID, discussionType);
+      } catch (error) {
+        console.error(`[collectByTagWithOptions] 获取摘要失败，跳过ID: ${item.ID}`, error instanceof Error ? error.message : String(error));
+        batchSkipped += 1;
+        continue;
+      }
+      
       const text = summary.Data.Description.join('');
       if (!text.trim()) {
         console.log(`[collectByTagWithOptions] 内容为空，跳过: ${item.ID}`);
@@ -157,7 +180,7 @@ export async function collectByTagWithOptions(
         }
       });
 
-      const analyzeResults = await runWithConcurrency(analyzeTasks, 100);
+      const analyzeResults = await runWithConcurrency(analyzeTasks, config.collectAnalyzeConcurrency);
 
       // 累积插入任务（当前批）
       const insertTasks: (() => Promise<void>)[] = [];
@@ -177,7 +200,7 @@ export async function collectByTagWithOptions(
       // 并发执行数据库插入（当前批）
       if (insertTasks.length > 0) {
         console.log(`[collectByTagWithOptions] 第 ${batchNum} 批: 开始并发插入 ${insertTasks.length} 条记录...`);
-        const insertResults = await runWithConcurrency(insertTasks, 100);
+        const insertResults = await runWithConcurrency(insertTasks, config.collectInsertConcurrency);
         inserted += insertResults.length;
       }
     }
@@ -185,8 +208,8 @@ export async function collectByTagWithOptions(
     skipped += batchSkipped;
     
     // 批次间延迟，避免频繁请求
-    if (i + batchSize < items.length) {
-      await new Promise((r) => setTimeout(r, 1000));
+    if (i + batchSize < items.length && config.collectBatchDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, config.collectBatchDelayMs));
     }
   }
 
@@ -204,12 +227,15 @@ export async function collectByTag(tag: string,discussionType: string): Promise<
 
 export async function backfillByDiscussionIds(ids: string[]): Promise<{ inserted: number; skipped: number }> {
   const user = await createUser();
+  console.log(
+    `[backfillByDiscussionIds] 参数: batchSize=${config.backfillBatchSize}, analyzeConcurrency=${config.collectAnalyzeConcurrency}, insertConcurrency=${config.collectInsertConcurrency}, batchDelayMs=${config.collectBatchDelayMs}`
+  );
   let inserted = 0;
   let skipped = 0;
   
-  const batchSize = 10;
+  const batchSize = config.backfillBatchSize;
 
-  // 分批处理：每批10个ID
+  // 分批处理ID，批大小由配置控制
   for (let i = 0; i < ids.length; i += batchSize) {
     const batch = ids.slice(i, i + batchSize);
     const batchNum = Math.floor(i / batchSize) + 1;
@@ -229,7 +255,15 @@ export async function backfillByDiscussionIds(ids: string[]): Promise<{ inserted
       }
 
       console.log(`[backfillByDiscussionIds] 开始处理ID: ${id}`);
-      const summary = await user.projects.getSummary(id, 'Discussion');
+      let summary;
+      try {
+        summary = await user.projects.getSummary(id, 'Discussion');
+      } catch (error) {
+        console.error(`[backfillByDiscussionIds] 获取摘要失败，跳过ID: ${id}`, error instanceof Error ? error.message : String(error));
+        batchSkipped += 1;
+        continue;
+      }
+      
       const text = summary.Data.Description.join('');
       if (!text.trim()) {
         console.log(`[backfillByDiscussionIds] 内容为空，跳过: ${id}`);
@@ -254,7 +288,7 @@ export async function backfillByDiscussionIds(ids: string[]): Promise<{ inserted
         }
       });
 
-      const analyzeResults = await runWithConcurrency(analyzeTasks, 100);
+      const analyzeResults = await runWithConcurrency(analyzeTasks, config.collectAnalyzeConcurrency);
 
       // 累积插入任务（当前批）
       const insertTasks: (() => Promise<void>)[] = [];
@@ -290,7 +324,7 @@ export async function backfillByDiscussionIds(ids: string[]): Promise<{ inserted
       // 并发执行数据库插入（当前批）
       if (insertTasks.length > 0) {
         console.log(`[backfillByDiscussionIds] 第 ${batchNum} 批: 开始并发插入 ${insertTasks.length} 条记录...`);
-        const insertResults = await runWithConcurrency(insertTasks, 100);
+        const insertResults = await runWithConcurrency(insertTasks, config.collectInsertConcurrency);
         inserted += insertResults.length;
       }
     }
@@ -298,8 +332,8 @@ export async function backfillByDiscussionIds(ids: string[]): Promise<{ inserted
     skipped += batchSkipped;
     
     // 批次间延迟，避免频繁请求
-    if (i + batchSize < ids.length) {
-      await new Promise((r) => setTimeout(r, 1000));
+    if (i + batchSize < ids.length && config.collectBatchDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, config.collectBatchDelayMs));
     }
   }
 

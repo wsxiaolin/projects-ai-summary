@@ -15,6 +15,8 @@ const aiClient = useOpenAI
   ? new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.apiBaseUrl,
+      timeout: config.aiRequestTimeoutMs,
+      maxRetries: 0,
       dangerouslyAllowBrowser: true
     })
   : null;
@@ -241,7 +243,10 @@ export async function openaiChatCompletion(
     console.log(`[AI] 使用 ${provider} 发送请求 - 模型: ${request.model}, 消息数: ${request.messages.length}`);
 
     if (useOpenAI && aiClient) {
-      const response = await aiClient.chat.completions.create(request as any);
+      const response = await aiClient.chat.completions.create(request as any, {
+        timeout: config.aiRequestTimeoutMs,
+        maxRetries: 0,
+      });
       console.log('[AI] OpenAI 响应成功');
       const normalized = response as unknown as OpenAIChatCompletionResponse;
       recordAiCompletion('OpenAI', normalized);
@@ -268,7 +273,7 @@ export async function openaiChatCompletion(
           Authorization: `Bearer ${config.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: config.aiRequestTimeoutMs
       }
     );
 

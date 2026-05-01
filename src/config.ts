@@ -28,6 +28,10 @@ function readEnvInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function readEnvIntAtLeast(name: string, fallback: number, minimum: number): number {
+  return Math.max(readEnvInt(name, fallback), minimum);
+}
+
 const openaiApiKey = readEnv('OPENAI_API_KEY');
 const sparkApiPassword = readEnv('SPARK_API_PASSWORD');
 
@@ -54,12 +58,20 @@ export const config = {
   // 数据收集参数
   skip: readEnvInt('SKIP', 0),
   take: readEnvInt('TAKE', -100),
+  collectPageSize: readEnvIntAtLeast('COLLECT_PAGE_SIZE', 20, 1),
+  collectBatchSize: readEnvIntAtLeast('COLLECT_BATCH_SIZE', 20, 1),
+  collectAnalyzeConcurrency: readEnvIntAtLeast('COLLECT_ANALYZE_CONCURRENCY', 20, 1),
+  collectInsertConcurrency: readEnvIntAtLeast('COLLECT_INSERT_CONCURRENCY', 20, 1),
+  collectPageDelayMs: readEnvIntAtLeast('COLLECT_PAGE_DELAY_MS', 500, 0),
+  collectBatchDelayMs: readEnvIntAtLeast('COLLECT_BATCH_DELAY_MS', 1000, 0),
+  backfillBatchSize: readEnvIntAtLeast('BACKFILL_BATCH_SIZE', 10, 1),
   
   // AI 服务配置（自动选择 OpenAI 或 Spark）
   // 优先使用 OpenAI，若无则使用 Spark
   apiKey: openaiApiKey ?? sparkApiPassword ?? '',
   model: readEnv('OPENAI_MODEL') ?? readEnv('SPARK_MODEL') ?? 'gpt-3.5-turbo',
   apiBaseUrl: readEnvWithDefault('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+  aiRequestTimeoutMs: readEnvInt('AI_REQUEST_TIMEOUT_MS', 45000),
   apiEndpoint: readEnvWithDefault(
     'SPARK_ENDPOINT',
     'https://spark-api-open.xf-yun.com/v1/chat/completions',

@@ -53,29 +53,45 @@ async function updateRemoteLogSummary(content: string): Promise<void> {
     return;
   }
 
-  const user = await createUserWithCredentials(
-    config.logSummaryUsername,
-    config.logSummaryPassword,
-  );
-  const summary = await user.projects.getSummary(
-    config.logSummaryId,
-    config.logSummaryCategory,
-  );
-  const experiment = await user.experiment.get(
-    config.logSummaryId,
-    config.logSummaryCategory,
-  );
+  try {
+    const user = await createUserWithCredentials(
+      config.logSummaryUsername,
+      config.logSummaryPassword,
+    );
+    
+    // 使用Promise.race创建带超时的API调用
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Update remote log summary timeout')), 30000); // 30秒超时
+    });
+    
+    const updatePromise = (async () => {
+      const summary = await user.projects.getSummary(
+        config.logSummaryId,
+        config.logSummaryCategory,
+      );
+      const experiment = await user.experiment.get(
+        config.logSummaryId,
+        config.logSummaryCategory,
+      );
 
-  const summaryData = summary?.Data ?? {};
-  const workspace = experiment?.Data ?? experiment;
+      const summaryData = summary?.Data ?? {};
+      const workspace = experiment?.Data ?? experiment;
 
-  await user.experiment.update(
-    {
-      ...summaryData,
-      Description: [content],
-    },
-    workspace,
-  );
+      await user.experiment.update(
+        {
+          ...summaryData,
+          Description: [content],
+        },
+        workspace,
+      );
+    })();
+    
+    // 竞争执行，哪个先完成就返回哪个的结果
+    await Promise.race([updatePromise, timeoutPromise]);
+  } catch (error) {
+    console.error(`[Logger] Failed to update summary: ${error instanceof Error ? error.message : String(error)}`);
+    // 不抛出错误，只是记录错误，这样不会导致程序挂起
+  }
 }
 
 export class RunLogger {
