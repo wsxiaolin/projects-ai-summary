@@ -58,8 +58,8 @@ export const config = {
   // 数据收集参数
   skip: readEnvInt('SKIP', 0),
   take: readEnvInt('TAKE', -100),
-  collectPageSize: readEnvIntAtLeast('COLLECT_PAGE_SIZE', 20, 1),
-  collectBatchSize: readEnvIntAtLeast('COLLECT_BATCH_SIZE', 5, 1),
+  collectPageSize: readEnvIntAtLeast('COLLECT_PAGE_SIZE', 100, 1),
+  collectBatchSize: readEnvIntAtLeast('COLLECT_BATCH_SIZE', 100, 1),
   collectAnalyzeConcurrency: readEnvIntAtLeast('COLLECT_ANALYZE_CONCURRENCY', 5, 1),
   collectInsertConcurrency: readEnvIntAtLeast('COLLECT_INSERT_CONCURRENCY', 5, 1),
   collectPageDelayMs: readEnvIntAtLeast('COLLECT_PAGE_DELAY_MS', 0, 0),
