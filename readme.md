@@ -69,7 +69,13 @@ npm run flexible-collect -- --take -50
 npm run export-d1
 ```
 
-线上服务：`https://pl-search-cloudflare.zongkuli2.workers.dev`
+线上服务：`https://s.pltown.online`
+
+作品详情：`https://s.pltown.online/w/<作品ID>`
+全部作品：`https://s.pltown.online/works`
+Sitemap：`https://s.pltown.online/sitemap.xml`
+
+Worker Cron 每 6 小时主动 ping Google/Bing sitemap，并用 IndexNow 提交作品 URL。百度推送需要 Worker Secret `BAIDU_ZHANZHANG_TOKEN`。
 
 ## 埋点与日志
 

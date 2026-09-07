@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/services/collectionFilter.test.js dist/services/recordSource.test.js cloudflare/worker.searchQuery.test.mjs",
+    "test": "npm run build && node --test dist/services/collectionFilter.test.js dist/services/recordSource.test.js cloudflare/worker.searchQuery.test.mjs cloudflare/seo.test.mjs",
     "update-db": "node dist/scripts/updateDatabase.js",
     "export-d1": "node dist/scripts/exportD1Sql.js",
     "flexible-collect": "node dist/scripts/collect.js"
