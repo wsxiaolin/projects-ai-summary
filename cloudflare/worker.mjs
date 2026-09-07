@@ -4,6 +4,7 @@
   buildSitemapIndexXml,
   buildStaticSitemapUrls,
   buildUrlSetXml,
+  ensureSeoTables,
   htmlResponse,
   isIndexNowKeyPath,
   maybeCanonicalRedirect,
@@ -578,6 +579,19 @@ export default {
             "SELECT id, ts, path, message, extra FROM error_logs ORDER BY id DESC LIMIT 50"
           ).all();
           return ok({ type, errors: rows.results ?? [] });
+        }
+        if (type === "seo") {
+          await ensureSeoTables(env);
+          const rows = await env.DB.prepare(
+            "SELECT engine, cursor_id, last_run_at, last_status FROM seo_index_state"
+          ).all();
+          return ok({
+            type,
+            googleConfigured: Boolean(String(env?.GOOGLE_SA_JSON || "").trim()),
+            baiduConfigured: Boolean(String(env?.BAIDU_ZHANZHANG_TOKEN || "").trim()),
+            indexnowConfigured: Boolean(String(env?.INDEXNOW_KEY || "").trim()),
+            state: rows.results ?? [],
+          });
         }
         return ok({ error: "unknown stats type" }, 400);
       }

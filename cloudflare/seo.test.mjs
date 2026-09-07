@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  INDEXNOW_ENDPOINTS,
   SEO_CONSTANTS,
   buildBaiduBody,
   buildIndexNowPayload,
@@ -8,6 +9,8 @@ import {
   buildSitemapIndexXml,
   buildStaticSitemapUrls,
   buildUrlSetXml,
+  googleSitemapSubmitUrl,
+  googleSiteUrl,
   isIndexNowKeyPath,
   parseWorkId,
   parseWorksPage,
@@ -15,6 +18,7 @@ import {
   renderWorksIndex,
   runSeoSubmission,
   sitemapPageCount,
+  sitemapPingUrls,
   submissionCursor,
   worksListPageCount,
 } from "./seo.mjs";
@@ -35,8 +39,13 @@ test("robots and sitemap index cover all works", () => {
   const origin = "https://s.pltown.online";
   const robots = buildRobotsTxt(origin);
   assert.match(robots, /Allow: \/w\//);
+  assert.match(robots, /User-agent: Googlebot/);
+  assert.match(robots, /User-agent: Bingbot/);
+  assert.match(robots, /User-agent: Yandex/);
+  assert.match(robots, /User-agent: Baiduspider/);
   assert.match(robots, /Disallow: \/api\//);
   assert.match(robots, /Disallow: \/\?q=/);
+  assert.match(robots, /Host: s\.pltown\.online/);
   assert.match(robots, /Sitemap: https:\/\/s\.pltown\.online\/sitemap\.xml/);
 
   const xml = buildSitemapIndexXml(origin, 24570, "2026-09-07T00:00:00.000Z");
@@ -65,6 +74,7 @@ test("work page is crawlable HTML with canonical and json-ld", () => {
     primaryDiscipline: ["物理"],
   });
   assert.match(html, /<link rel="canonical" href="https:\/\/s\.pltown\.online\/w\/66a473d59e258e6b2f529e29">/);
+  assert.match(html, /hreflang="zh-CN"/);
   assert.match(html, /力学实验 &lt;script&gt;/);
   assert.match(html, /application\/ld\+json/);
   assert.match(html, /"@type":"CreativeWork"/);
@@ -83,6 +93,19 @@ test("works index paginates and links to work pages", () => {
   assert.match(html, /href="https:\/\/s\.pltown\.online\/w\/66a473d59e258e6b2f529e29"/);
   assert.match(html, /上一页/);
   assert.match(html, /下一页/);
+});
+
+test("Google sitemap submit URL uses Search Console API", () => {
+  const origin = "https://s.pltown.online";
+  const siteUrl = googleSiteUrl({ GOOGLE_SITE_URL: "sc-domain:pltown.online" }, origin);
+  assert.equal(siteUrl, "sc-domain:pltown.online");
+  const submit = googleSitemapSubmitUrl("https://s.pltown.online/", `${origin}/sitemap.xml`);
+  assert.match(submit, /webmasters\/v3\/sites\//);
+  assert.match(submit, /sitemaps\//);
+  const pings = sitemapPingUrls(origin);
+  assert.equal(pings.some((url) => url.includes("google.com/ping")), false);
+  assert.ok(pings.some((url) => url.includes("bing.com/ping")));
+  assert.ok(pings.some((url) => url.includes("yandex.com/ping") || url.includes("webmaster.yandex.com/ping")));
 });
 
 test("IndexNow payload and Baidu body stay within batch limits", () => {
@@ -125,6 +148,7 @@ test("runSeoSubmission posts IndexNow and Baidu batches", async () => {
     SITE_ORIGIN: "https://s.pltown.online",
     INDEXNOW_KEY: "8f3c1a6b9d2e4f70a1c5b8d3e6f90a12",
     BAIDU_ZHANZHANG_TOKEN: "baidu-token",
+    GOOGLE_SA_JSON: "",
     DB: {
       batch: async () => {},
       prepare(sql) {
@@ -170,8 +194,13 @@ test("runSeoSubmission posts IndexNow and Baidu batches", async () => {
   const summary = await runSeoSubmission(env, { fetchImpl });
   assert.equal(summary.indexnow.status, 200);
   assert.equal(summary.baidu.status, 200);
-  assert.ok(calls.some((item) => String(item.url).includes("api.indexnow.org")));
+  assert.equal(summary.google.status, "skipped");
+  for (const endpoint of INDEXNOW_ENDPOINTS) {
+    assert.ok(calls.some((item) => String(item.url) === endpoint), endpoint);
+  }
   assert.ok(calls.some((item) => String(item.url).includes("data.zz.baidu.com")));
+  assert.ok(calls.some((item) => String(item.url).includes("webmaster.yandex.com/ping")));
+  assert.equal(calls.some((item) => String(item.url).includes("google.com/ping")), false);
   const indexNow = calls.find((item) => String(item.url).includes("api.indexnow.org"));
   const body = JSON.parse(indexNow.init.body);
   assert.ok(body.urlList.includes("https://s.pltown.online/w/66a473d59e258e6b2f529e20"));

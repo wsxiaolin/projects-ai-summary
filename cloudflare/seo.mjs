@@ -5,6 +5,14 @@ const INDEXNOW_BATCH = 9990;
 const BAIDU_BATCH = 1998;
 const RESUBMIT_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
+export const INDEXNOW_ENDPOINTS = [
+  "https://api.indexnow.org/indexnow",
+  "https://www.bing.com/indexnow",
+  "https://yandex.com/indexnow",
+  "https://search.seznam.cz/indexnow",
+  "https://searchadvisor.naver.com/indexnow",
+];
+
 export const SEO_CONSTANTS = {
   WORK_ID_RE,
   SITEMAP_CHUNK,
@@ -79,6 +87,7 @@ function plUrls(id) {
 }
 
 export function buildRobotsTxt(origin) {
+  const host = new URL(origin).host;
   return [
     "User-agent: *",
     "Allow: /",
@@ -87,6 +96,25 @@ export function buildRobotsTxt(origin) {
     "Disallow: /api/",
     "Disallow: /?q=",
     "",
+    "User-agent: Googlebot",
+    "Allow: /",
+    "Allow: /w/",
+    "Allow: /works",
+    "Disallow: /api/",
+    "",
+    "User-agent: Bingbot",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: Yandex",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: Baiduspider",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    `Host: ${host}`,
     `Sitemap: ${origin}/sitemap.xml`,
     "",
   ].join("\n");
@@ -168,6 +196,80 @@ export function buildBaiduBody(urls) {
   return urls.join("\n");
 }
 
+export function googleSiteUrl(env, origin) {
+  const configured = String(env?.GOOGLE_SITE_URL || "").trim();
+  if (configured) return configured;
+  return `${origin}/`;
+}
+
+export function googleSitemapSubmitUrl(siteUrl, sitemapUrl) {
+  return `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/sitemaps/${encodeURIComponent(sitemapUrl)}`;
+}
+
+export function sitemapPingUrls(origin) {
+  const sitemapUrl = `${origin}/sitemap.xml`;
+  return [
+    `https://www.bing.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`,
+    `https://webmaster.yandex.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`,
+  ];
+}
+
+function toBase64Url(input) {
+  const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let bin = "";
+  for (const byte of arr) bin += String.fromCharCode(byte);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function pemToPkcs8(pem) {
+  const b64 = String(pem)
+    .replace(/-----BEGIN [^-]+-----/g, "")
+    .replace(/-----END [^-]+-----/g, "")
+    .replace(/\s+/g, "");
+  const raw = atob(b64);
+  const buf = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) buf[i] = raw.charCodeAt(i);
+  return buf.buffer;
+}
+
+export async function getGoogleAccessToken(saJson, fetchImpl = fetch) {
+  const sa = typeof saJson === "string" ? JSON.parse(saJson) : saJson;
+  const now = Math.floor(Date.now() / 1000);
+  const header = toBase64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = toBase64Url(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/webmasters",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  }));
+  const unsigned = `${header}.${claim}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToPkcs8(sa.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned),
+  );
+  const jwt = `${unsigned}.${toBase64Url(new Uint8Array(signature))}`;
+  const response = await fetchImpl("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `grant_type=${encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer")}&assertion=${encodeURIComponent(jwt)}`,
+  });
+  const data = await response.json();
+  if (!data?.access_token) {
+    throw new Error(`google oauth failed: ${data?.error || response.status}`);
+  }
+  return data.access_token;
+}
+
 function jsonLdScript(data) {
   return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
 }
@@ -180,6 +282,8 @@ function baseHead({ origin, title, description, canonical, extra = "", robots = 
 <meta name="description" content="${escapeHtml(description)}">
 <meta name="robots" content="${escapeHtml(robots)}">
 <link rel="canonical" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="zh-CN" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="x-default" href="${escapeHtml(canonical)}">
 <link rel="sitemap" type="application/xml" href="${escapeHtml(origin)}/sitemap.xml">
 <meta property="og:site_name" content="PL Town 作品库">
 <meta property="og:locale" content="zh_CN">
@@ -457,24 +561,68 @@ async function submitUrlBatch({ env, engine, origin, limit, includeHome, send })
   }
 }
 
-export async function runSeoSubmission(env, { fetchImpl = fetch } = {}) {
-  const origin = siteOrigin(env, new URL("https://s.pltown.online"));
-  const summary = { origin, indexnow: null, baidu: null, pings: [] };
-  await ensureSeoTables(env);
-
-  const sitemapUrl = `${origin}/sitemap.xml`;
-  const pingTargets = [
-    `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`,
-    `https://www.bing.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`,
-  ];
-  for (const pingUrl of pingTargets) {
+async function pingSitemaps(origin, fetchImpl) {
+  const results = [];
+  for (const pingUrl of sitemapPingUrls(origin)) {
     try {
       const response = await fetchImpl(pingUrl, { method: "GET" });
-      summary.pings.push({ url: pingUrl, status: response.status });
+      results.push({ url: pingUrl, status: response.status });
     } catch (error) {
-      summary.pings.push({ url: pingUrl, error: String(error?.message || error) });
+      results.push({ url: pingUrl, error: String(error?.message || error) });
     }
   }
+  return results;
+}
+
+async function submitGoogleSitemaps(env, origin, fetchImpl) {
+  const saJson = String(env?.GOOGLE_SA_JSON || "").trim();
+  if (!saJson) return { status: "skipped" };
+  const sitemapUrl = `${origin}/sitemap.xml`;
+  const siteUrl = googleSiteUrl(env, origin);
+  try {
+    const token = await getGoogleAccessToken(saJson, fetchImpl);
+    const response = await fetchImpl(googleSitemapSubmitUrl(siteUrl, sitemapUrl), {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await response.text();
+    return { status: response.status, siteUrl, sitemapUrl, body: body.slice(0, 300) };
+  } catch (error) {
+    return { status: "error", error: String(error?.message || error) };
+  }
+}
+
+async function postIndexNow(origin, key, urls, fetchImpl) {
+  const payload = JSON.stringify(buildIndexNowPayload(origin, key, urls));
+  const results = [];
+  let okStatus = 0;
+  for (const endpoint of INDEXNOW_ENDPOINTS) {
+    try {
+      const response = await fetchImpl(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: payload,
+      });
+      results.push({ endpoint, status: response.status });
+      if (response.status >= 200 && response.status < 300 && !okStatus) okStatus = response.status;
+    } catch (error) {
+      results.push({ endpoint, error: String(error?.message || error) });
+    }
+  }
+  if (!okStatus) {
+    const first = results[0];
+    return { status: first?.status || 502, body: JSON.stringify(results).slice(0, 180), results };
+  }
+  return { status: okStatus, results };
+}
+
+export async function runSeoSubmission(env, { fetchImpl = fetch } = {}) {
+  const origin = siteOrigin(env, new URL("https://s.pltown.online"));
+  const summary = { origin, google: null, indexnow: null, baidu: null, pings: [] };
+  await ensureSeoTables(env);
+
+  summary.pings = await pingSitemaps(origin, fetchImpl);
+  summary.google = await submitGoogleSitemaps(env, origin, fetchImpl);
 
   const indexnowKey = String(env?.INDEXNOW_KEY || "").trim();
   if (indexnowKey) {
@@ -484,14 +632,7 @@ export async function runSeoSubmission(env, { fetchImpl = fetch } = {}) {
       origin,
       limit: INDEXNOW_BATCH,
       includeHome: true,
-      send: async (urls) => {
-        const response = await fetchImpl("https://api.indexnow.org/indexnow", {
-          method: "POST",
-          headers: { "content-type": "application/json; charset=utf-8" },
-          body: JSON.stringify(buildIndexNowPayload(origin, indexnowKey, urls)),
-        });
-        return { status: response.status };
-      },
+      send: async (urls) => postIndexNow(origin, indexnowKey, urls, fetchImpl),
     });
   }
 
