@@ -14,6 +14,8 @@ import {
   isIndexNowKeyPath,
   parseWorkId,
   parseWorksPage,
+  renderCatalogItem,
+  renderHomeNoscript,
   renderWorkPage,
   renderWorksIndex,
   runSeoSubmission,
@@ -63,10 +65,11 @@ test("static sitemap includes paginated works index", () => {
 });
 
 test("work page is crawlable HTML with canonical and json-ld", () => {
+  const longSummary = "甲".repeat(220);
   const html = renderWorkPage("https://s.pltown.online", {
     id: "66a473d59e258e6b2f529e29",
     name: "力学实验 <script>",
-    summary: "研究牛顿定律",
+    summary: longSummary,
     userName: "张三",
     year: 2024,
     source: "实验精选",
@@ -75,24 +78,52 @@ test("work page is crawlable HTML with canonical and json-ld", () => {
   });
   assert.match(html, /<link rel="canonical" href="https:\/\/s\.pltown\.online\/w\/66a473d59e258e6b2f529e29">/);
   assert.match(html, /hreflang="zh-CN"/);
-  assert.match(html, /力学实验 &lt;script&gt;/);
+  assert.match(html, /<h1 itemprop="name">力学实验 &lt;script&gt;<\/h1>/);
+  assert.match(html, /itemprop="abstract"/);
+  assert.ok(html.includes(longSummary));
+  assert.match(html, /"abstract":/);
   assert.match(html, /application\/ld\+json/);
   assert.match(html, /"@type":"CreativeWork"/);
   assert.match(html, /name="robots" content="index,follow/);
 });
 
 test("works index paginates and links to work pages", () => {
+  const fullSummary = "乙".repeat(180);
   const html = renderWorksIndex({
     origin: "https://s.pltown.online",
     page: 2,
     total: 450,
     lastmod: "2026-09-07T00:00:00.000Z",
-    records: [{ id: "66a473d59e258e6b2f529e29", name: "示例", userName: "李四", year: 2023, summary: "摘要" }],
+    records: [{ id: "66a473d59e258e6b2f529e29", name: "示例", userName: "李四", year: 2023, summary: fullSummary }],
   });
   assert.match(html, /rel="canonical" href="https:\/\/s\.pltown\.online\/works\?page=2"/);
   assert.match(html, /href="https:\/\/s\.pltown\.online\/w\/66a473d59e258e6b2f529e29"/);
+  assert.match(html, /<h2 class="t" itemprop="name">示例<\/h2>/);
+  assert.ok(html.includes(fullSummary));
+  assert.ok(!html.includes(`${"乙".repeat(80)}…`));
   assert.match(html, /上一页/);
   assert.match(html, /下一页/);
+});
+
+test("home crawl block exposes title and full summary", () => {
+  const html = renderHomeNoscript("https://s.pltown.online", [{
+    id: "66a473d59e258e6b2f529e29",
+    name: "天体运动",
+    userName: "王五",
+    year: 2025,
+    summary: "完整摘要必须出现在首屏可抓 HTML 中。",
+  }]);
+  assert.match(html, /id="crawl-index"/);
+  assert.match(html, /天体运动/);
+  assert.match(html, /完整摘要必须出现在首屏可抓 HTML 中。/);
+  assert.match(html, /itemprop="abstract"/);
+  const item = renderCatalogItem("https://s.pltown.online", {
+    id: "66a473d59e258e6b2f529e29",
+    name: "主题标题",
+    summary: "全文摘要内容",
+  });
+  assert.match(item, /主题标题/);
+  assert.match(item, /全文摘要内容/);
 });
 
 test("Google sitemap submit URL uses Search Console API", () => {

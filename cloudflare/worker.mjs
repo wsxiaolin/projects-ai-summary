@@ -10,6 +10,7 @@
   maybeCanonicalRedirect,
   parseWorkId,
   parseWorksPage,
+  renderHomeNoscript,
   renderNotFoundPage,
   renderWorkPage,
   renderWorksIndex,
@@ -445,6 +446,25 @@ async function handleSeoGet(request, env, url) {
     return textResponse(buildUrlSetXml(urls, lastmod), "application/xml; charset=utf-8");
   }
 
+  if (pathname === "/" || pathname === "/index.html") {
+    const records = await queryAll(
+      env,
+      "SELECT id, name, userName, year, source, summary FROM data ORDER BY year DESC, id ASC LIMIT ?",
+      [50],
+    );
+    if (env.ASSETS) {
+      const assetResponse = await env.ASSETS.fetch(request);
+      const html = await assetResponse.text();
+      const crawlable = renderHomeNoscript(origin, records);
+      const body = html.includes("<footer>")
+        ? html.replace("<footer>", `${crawlable}\n<footer>`)
+        : html.includes("</body>")
+          ? html.replace("</body>", `${crawlable}\n</body>`)
+          : `${html}${crawlable}`;
+      return htmlResponse(body, 200, { "cache-control": "public, max-age=600" });
+    }
+  }
+
   if (pathname === "/works") {
     const page = parseWorksPage(url);
     const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM data").first();
@@ -452,7 +472,7 @@ async function handleSeoGet(request, env, url) {
     const offset = (page - 1) * SEO_CONSTANTS.WORKS_PAGE_SIZE;
     const records = await queryAll(
       env,
-      "SELECT id, name, userName, year, summary FROM data ORDER BY year DESC, id ASC LIMIT ? OFFSET ?",
+      "SELECT id, name, userName, year, source, summary FROM data ORDER BY year DESC, id ASC LIMIT ? OFFSET ?",
       [SEO_CONSTANTS.WORKS_PAGE_SIZE, offset],
     );
     const lastmod = (await getGeneratedAt(env)) || new Date().toISOString();

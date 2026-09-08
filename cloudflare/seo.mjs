@@ -319,8 +319,9 @@ h1{font-size:clamp(26px,6vw,36px);letter-spacing:-.02em;line-height:1.25;overflo
 .list{list-style:none;display:flex;flex-direction:column;gap:12px;margin-top:18px}
 .list a{text-decoration:none}
 .list li{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
-.list .t{font-weight:650}
+.list h2,.list .t{font-weight:650;font-size:17px;line-height:1.4;margin:0}
 .list .s{margin-top:4px;font-size:13px;color:var(--ink3)}
+.list .summary{margin-top:10px;color:var(--ink2);white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 .pager{margin-top:22px;display:flex;gap:16px;font-size:14px}
 .pager a{color:var(--accent);text-decoration:none}
 .note{margin-top:18px;font-size:12px;color:var(--ink3)}
@@ -329,8 +330,8 @@ footer{margin-top:28px;font-size:12px;color:var(--ink3)}`;
 export function renderWorkPage(origin, record) {
   const id = String(record.id || "").toLowerCase();
   const name = record.name || "未命名作品";
-  const summary = record.summary || "PL Town 社区作品。";
-  const description = truncateText(`${name}。${summary}`);
+  const summary = String(record.summary || "").trim() || "PL Town 社区作品。";
+  const description = truncateText(`${name}。${summary}`, 160);
   const canonical = workUrl(origin, id);
   const author = record.userName || "匿名";
   const keywords = asList(record.keyWords);
@@ -343,9 +344,11 @@ export function renderWorkPage(origin, record) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CreativeWork",
+    headline: name,
     name,
     url: canonical,
-    description: truncateText(summary, 300),
+    description: summary,
+    abstract: summary,
     inLanguage: "zh-CN",
     author: { "@type": "Person", name: author },
     dateCreated: year ? String(year) : undefined,
@@ -376,11 +379,11 @@ ${baseHead({ origin, title: `${name} · PL Town 作品库`, description, canonic
   </nav>
 </div></header>
 <main class="wrap">
-  <p class="note">${escapeHtml(source)}${year ? ` · ${escapeHtml(year)}` : ""}</p>
-  <h1>${escapeHtml(name)}</h1>
-  <p class="meta">作者 ${escapeHtml(author)}${record.editorName ? ` · 编辑 ${escapeHtml(record.editorName)}` : ""} · ID ${escapeHtml(id)}</p>
-  <article class="card">
-    <p class="summary">${escapeHtml(summary)}</p>
+  <article class="card" itemscope itemtype="https://schema.org/CreativeWork">
+    <p class="note">${escapeHtml(source)}${year ? ` · ${escapeHtml(year)}` : ""}</p>
+    <h1 itemprop="name">${escapeHtml(name)}</h1>
+    <p class="meta">作者 <span itemprop="author">${escapeHtml(author)}</span>${record.editorName ? ` · 编辑 ${escapeHtml(record.editorName)}` : ""} · ID ${escapeHtml(id)}</p>
+    <p class="summary" itemprop="abstract">${escapeHtml(summary)}</p>
     ${tagLinks ? `<div class="tags">${tagLinks}</div>` : ""}
     <div class="links">
       <a href="${escapeHtml(links.experiment)}" rel="noopener">在物理实验室以实验打开</a>
@@ -391,6 +394,14 @@ ${baseHead({ origin, title: `${name} · PL Town 作品库`, description, canonic
 </main>
 </body>
 </html>`;
+}
+
+export function renderCatalogItem(origin, row, tag = "li") {
+  const href = workUrl(origin, row.id);
+  const name = row.name || "未命名作品";
+  const summary = String(row.summary || "").trim();
+  const meta = [row.userName || "匿名", row.year, row.source].filter(Boolean).join(" · ");
+  return `<${tag} itemscope itemtype="https://schema.org/CreativeWork"><a href="${escapeHtml(href)}"><h2 class="t" itemprop="name">${escapeHtml(name)}</h2></a><div class="s">${escapeHtml(meta)}</div>${summary ? `<p class="summary" itemprop="abstract">${escapeHtml(summary)}</p>` : ""}</${tag}>`;
 }
 
 export function renderWorksIndex({ origin, page, total, records, lastmod }) {
@@ -411,12 +422,19 @@ ${jsonLdScript({
     inLanguage: "zh-CN",
     isPartOf: origin,
     dateModified: lastmod || undefined,
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: records.length,
+      itemListElement: records.map((row, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: workUrl(origin, row.id),
+        name: row.name || "未命名作品",
+        description: String(row.summary || "").trim(),
+      })),
+    },
   })}`;
-  const items = records.map((row) => {
-    const href = workUrl(origin, row.id);
-    const snippet = truncateText(row.summary || "", 80);
-    return `<li><a href="${escapeHtml(href)}"><span class="t">${escapeHtml(row.name || "未命名作品")}</span></a><div class="s">${escapeHtml(row.userName || "匿名")}${row.year ? ` · ${escapeHtml(row.year)}` : ""}${snippet ? ` · ${escapeHtml(snippet)}` : ""}</div></li>`;
-  }).join("");
+  const items = records.map((row) => renderCatalogItem(origin, row, "li")).join("");
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -440,6 +458,11 @@ ${baseHead({ origin, title, description, canonical, extra })}
 </main>
 </body>
 </html>`;
+}
+
+export function renderHomeNoscript(origin, records) {
+  const items = records.map((row) => renderCatalogItem(origin, row, "article")).join("");
+  return `<section id="crawl-index"><h2>近期收录作品</h2><p>每篇作品的标题与摘要均对搜索引擎公开。<a href="${escapeHtml(origin)}/works">浏览全部作品</a></p><div class="list">${items}</div></section>`;
 }
 
 export function renderNotFoundPage(origin) {
