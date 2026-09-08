@@ -20,3 +20,10 @@ CREATE TABLE IF NOT EXISTS search_terms (
   count INTEGER NOT NULL DEFAULT 0,
   last_searched_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS seo_index_state (
+  engine TEXT PRIMARY KEY,
+  cursor_id TEXT,
+  last_run_at TEXT,
+  last_status TEXT
+);

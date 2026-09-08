@@ -11,3 +11,10 @@ database_id = "1ff32e2b-ab3c-4f78-aa15-9313e095e237"
 directory = "./public"
 binding = "ASSETS"
 run_worker_first = true
+
+[triggers]
+crons = ["18 */6 * * *"]
+
+[vars]
+SITE_ORIGIN = "https://s.pltown.online"
+INDEXNOW_KEY = "8f3c1a6b9d2e4f70a1c5b8d3e6f90a12"

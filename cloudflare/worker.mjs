@@ -1,7 +1,30 @@
-﻿const jsonHeaders = {
+﻿import {
+  SEO_CONSTANTS,
+  buildRobotsTxt,
+  buildSitemapIndexXml,
+  buildStaticSitemapUrls,
+  buildUrlSetXml,
+  ensureSeoTables,
+  htmlResponse,
+  isIndexNowKeyPath,
+  maybeCanonicalRedirect,
+  parseWorkId,
+  parseWorksPage,
+  renderHomeNoscript,
+  renderNotFoundPage,
+  renderWorkPage,
+  renderWorksIndex,
+  runSeoSubmission,
+  siteOrigin,
+  textResponse,
+  workUrl,
+} from "./seo.mjs";
+
+const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
   "access-control-allow-origin": "*",
+  "x-robots-tag": "noindex",
 };
 
 const MAX_LIMIT = 50;
@@ -364,9 +387,121 @@ function ok(data, status = 200) {
   });
 }
 
+function handlePublicSeoFiles(env, url) {
+  const origin = siteOrigin(env, url);
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
+  const indexnowKey = String(env?.INDEXNOW_KEY || "").trim();
+
+  if (isIndexNowKeyPath(url.pathname, indexnowKey) || isIndexNowKeyPath(pathname, indexnowKey)) {
+    return textResponse(indexnowKey, "text/plain; charset=utf-8", "public, max-age=86400");
+  }
+
+  if (pathname === "/robots.txt") {
+    return textResponse(buildRobotsTxt(origin), "text/plain; charset=utf-8", "public, max-age=86400");
+  }
+
+  if (pathname === "/open.html") {
+    const id = String(url.searchParams.get("id") || "").trim();
+    if (id && SEO_CONSTANTS.WORK_ID_RE.test(id)) {
+      return Response.redirect(workUrl(origin, id), 301);
+    }
+  }
+
+  return null;
+}
+
+async function handleSeoGet(request, env, url) {
+  const origin = siteOrigin(env, url);
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
+
+  if (pathname === "/sitemap.xml") {
+    const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM data").first();
+    const lastmod = (await getGeneratedAt(env)) || new Date().toISOString();
+    return textResponse(
+      buildSitemapIndexXml(origin, Number(countRow?.total ?? 0), lastmod),
+      "application/xml; charset=utf-8",
+    );
+  }
+
+  if (pathname === "/sitemap-static.xml") {
+    const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM data").first();
+    const lastmod = (await getGeneratedAt(env)) || new Date().toISOString();
+    return textResponse(
+      buildUrlSetXml(buildStaticSitemapUrls(origin, Number(countRow?.total ?? 0), lastmod), lastmod),
+      "application/xml; charset=utf-8",
+    );
+  }
+
+  const sitemapMatch = pathname.match(/^\/sitemap-works-(\d+)\.xml$/);
+  if (sitemapMatch) {
+    const page = Math.max(1, Number(sitemapMatch[1]) || 1);
+    const offset = (page - 1) * SEO_CONSTANTS.SITEMAP_CHUNK;
+    const rows = await queryAll(
+      env,
+      "SELECT id FROM data ORDER BY id ASC LIMIT ? OFFSET ?",
+      [SEO_CONSTANTS.SITEMAP_CHUNK, offset],
+    );
+    const lastmod = (await getGeneratedAt(env)) || new Date().toISOString();
+    const urls = rows.map((row) => workUrl(origin, row.id));
+    return textResponse(buildUrlSetXml(urls, lastmod), "application/xml; charset=utf-8");
+  }
+
+  if (pathname === "/" || pathname === "/index.html") {
+    const records = await queryAll(
+      env,
+      "SELECT id, name, userName, year, source, summary FROM data ORDER BY year DESC, id ASC LIMIT ?",
+      [50],
+    );
+    if (env.ASSETS) {
+      const assetResponse = await env.ASSETS.fetch(request);
+      const html = await assetResponse.text();
+      const crawlable = renderHomeNoscript(origin, records);
+      const body = html.includes("<footer>")
+        ? html.replace("<footer>", `${crawlable}\n<footer>`)
+        : html.includes("</body>")
+          ? html.replace("</body>", `${crawlable}\n</body>`)
+          : `${html}${crawlable}`;
+      return htmlResponse(body, 200, { "cache-control": "public, max-age=600" });
+    }
+  }
+
+  if (pathname === "/works") {
+    const page = parseWorksPage(url);
+    const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM data").first();
+    const total = Number(countRow?.total ?? 0);
+    const offset = (page - 1) * SEO_CONSTANTS.WORKS_PAGE_SIZE;
+    const records = await queryAll(
+      env,
+      "SELECT id, name, userName, year, source, summary FROM data ORDER BY year DESC, id ASC LIMIT ? OFFSET ?",
+      [SEO_CONSTANTS.WORKS_PAGE_SIZE, offset],
+    );
+    const lastmod = (await getGeneratedAt(env)) || new Date().toISOString();
+    return htmlResponse(renderWorksIndex({ origin, page, total, records, lastmod }));
+  }
+
+  const workId = parseWorkId(url.pathname) || parseWorkId(pathname);
+  if (workId) {
+    const row = await env.DB.prepare("SELECT * FROM data WHERE id = ?").bind(workId).first();
+    if (!row) return htmlResponse(renderNotFoundPage(origin), 404);
+    return htmlResponse(renderWorkPage(origin, normalizeRecord(row)));
+  }
+
+  return null;
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runSeoSubmission(env).then((summary) => {
+      console.log("[seo] submission", JSON.stringify(summary));
+    }).catch((error) => {
+      console.error("[seo] submission failed", error?.message || error);
+    }));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const canonicalRedirect = maybeCanonicalRedirect(request, env, url);
+    if (canonicalRedirect) return canonicalRedirect;
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -397,11 +532,25 @@ export default {
       return ok({ error: "Method not allowed" }, 405);
     }
 
+    const publicSeo = handlePublicSeoFiles(env, url);
+    if (publicSeo) return publicSeo;
+
     if (!env.DB) {
       return ok({ error: "D1 database binding (DB) is not configured" }, 500);
     }
 
     try {
+      const seoResponse = await handleSeoGet(request, env, url);
+      if (seoResponse) return seoResponse;
+
+      if (url.pathname === "/api/seo/submit") {
+        const submitKey = String(env?.INDEXNOW_KEY || "").trim();
+        const given = String(url.searchParams.get("key") || "");
+        if (!submitKey || given !== submitKey) return ok({ error: "unauthorized" }, 401);
+        const summary = await runSeoSubmission(env);
+        return ok(summary);
+      }
+
       if (url.pathname === "/api/meta") {
         const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM data").first();
         return ok({
@@ -410,7 +559,7 @@ export default {
           totalRecords: Number(countRow?.total ?? 0),
           maxLimit: MAX_LIMIT,
           aiKeywordExpansion: Boolean(env?.GROQ_API_KEY),
-          endpoints: ["/api/meta", "/api/search?keywords=...", "/api/record?id=..."],
+          endpoints: ["/api/meta", "/api/search?keywords=...", "/api/record?id=...", "/w/:id", "/works", "/sitemap.xml", "/robots.txt"],
         });
       }
 
@@ -450,6 +599,19 @@ export default {
             "SELECT id, ts, path, message, extra FROM error_logs ORDER BY id DESC LIMIT 50"
           ).all();
           return ok({ type, errors: rows.results ?? [] });
+        }
+        if (type === "seo") {
+          await ensureSeoTables(env);
+          const rows = await env.DB.prepare(
+            "SELECT engine, cursor_id, last_run_at, last_status FROM seo_index_state"
+          ).all();
+          return ok({
+            type,
+            googleConfigured: Boolean(String(env?.GOOGLE_SA_JSON || "").trim()),
+            baiduConfigured: Boolean(String(env?.BAIDU_ZHANZHANG_TOKEN || "").trim()),
+            indexnowConfigured: Boolean(String(env?.INDEXNOW_KEY || "").trim()),
+            state: rows.results ?? [],
+          });
         }
         return ok({ error: "unknown stats type" }, 400);
       }

@@ -69,7 +69,13 @@ npm run flexible-collect -- --take -50
 npm run export-d1
 ```
 
-线上服务：`https://pl-search-cloudflare.zongkuli2.workers.dev`
+线上服务：`https://s.pltown.online`
+
+作品详情：`https://s.pltown.online/w/<作品ID>`
+全部作品：`https://s.pltown.online/works`
+Sitemap：`https://s.pltown.online/sitemap.xml`
+
+Worker Cron 每 6 小时：用 Google Search Console API 提交 sitemap，IndexNow 推送 Bing/Yandex/Naver/Seznam，百度普通收录主动推送。Google 需要 Worker Secret `GOOGLE_SA_JSON`，百度需要 `BAIDU_ZHANZHANG_TOKEN`。
 
 ## 埋点与日志
 
@@ -87,4 +93,5 @@ Worker 启动时自动在 D1 `plworks` 创建三张表（无需额外控制台�
 GET /api/stats?type=terms    搜索词 TOP50（term, count, last_searched_at）
 GET /api/stats?type=events   事件类型聚合 TOP50（event, count, last_ts）
 GET /api/stats?type=errors   最近 50 条错误日志（id, ts, path, message, extra）
+GET /api/stats?type=seo      国内外索引提交状态（Google / IndexNow / 百度）
 ```
