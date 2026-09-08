@@ -86,33 +86,29 @@ function plUrls(id) {
   };
 }
 
-export function buildRobotsTxt(origin) {
-  const host = new URL(origin).host;
+function robotsGroup(userAgent) {
   return [
-    "User-agent: *",
+    `User-agent: ${userAgent}`,
     "Allow: /",
     "Allow: /w/",
     "Allow: /works",
     "Disallow: /api/",
     "Disallow: /?q=",
+  ];
+}
+
+export function buildRobotsTxt(origin) {
+  const host = new URL(origin).host;
+  return [
+    ...robotsGroup("*"),
     "",
-    "User-agent: Googlebot",
-    "Allow: /",
-    "Allow: /w/",
-    "Allow: /works",
-    "Disallow: /api/",
+    ...robotsGroup("Googlebot"),
     "",
-    "User-agent: Bingbot",
-    "Allow: /",
-    "Disallow: /api/",
+    ...robotsGroup("Bingbot"),
     "",
-    "User-agent: Yandex",
-    "Allow: /",
-    "Disallow: /api/",
+    ...robotsGroup("Yandex"),
     "",
-    "User-agent: Baiduspider",
-    "Allow: /",
-    "Disallow: /api/",
+    ...robotsGroup("Baiduspider"),
     "",
     `Host: ${host}`,
     `Sitemap: ${origin}/sitemap.xml`,
@@ -538,9 +534,19 @@ async function nextIds(env, afterId, limit) {
   return (result?.results || []).map((row) => String(row.id));
 }
 
+function isSuccessfulSweepStatus(status) {
+  const text = String(status || "").trim();
+  if (text === "caught_up") return true;
+  const match = text.match(/^http_(\d+)\b/);
+  if (!match) return false;
+  const code = Number(match[1]);
+  return code >= 200 && code < 300;
+}
+
 export function submissionCursor(state, now = Date.now()) {
   if (state?.cursor_id) return { skip: false, cursor: state.cursor_id };
   if (!state?.last_run_at) return { skip: false, cursor: "" };
+  if (!isSuccessfulSweepStatus(state.last_status)) return { skip: false, cursor: "" };
   const then = Date.parse(state.last_run_at);
   if (!Number.isFinite(then) || now - then >= RESUBMIT_AFTER_MS) {
     return { skip: false, cursor: "" };
@@ -688,18 +694,32 @@ export function isIndexNowKeyPath(pathname, key) {
   return pathname === `/${key}.txt`;
 }
 
+export function canonicalRequestPath(pathname) {
+  let path = String(pathname || "/") || "/";
+  if (path === "/index.html") return "/";
+  if (path.length > 1 && path.endsWith("/")) path = path.replace(/\/+$/, "") || "/";
+  const workId = parseWorkId(path);
+  if (workId) return `/w/${workId}`;
+  return path;
+}
+
 export function maybeCanonicalRedirect(request, env, url) {
-  const origin = String(env?.SITE_ORIGIN || "").trim().replace(/\/+$/, "");
-  if (!origin) return null;
-  let canonicalHost;
-  try {
-    canonicalHost = new URL(origin).host;
-  } catch {
-    return null;
-  }
-  if (url.host === canonicalHost) return null;
-  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return null;
   if (url.pathname.startsWith("/api/")) return null;
-  const target = new URL(url.pathname + url.search, origin);
+  const origin = String(env?.SITE_ORIGIN || "").trim().replace(/\/+$/, "");
+  let canonicalHost = "";
+  if (origin) {
+    try {
+      canonicalHost = new URL(origin).host;
+    } catch {
+      canonicalHost = "";
+    }
+  }
+  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  const hostNeedsRedirect = Boolean(origin && canonicalHost && url.host !== canonicalHost && !isLocal);
+  const path = canonicalRequestPath(url.pathname);
+  const pathNeedsRedirect = path !== url.pathname;
+  if (!hostNeedsRedirect && !pathNeedsRedirect) return null;
+  const base = hostNeedsRedirect ? origin : `${url.protocol}//${url.host}`;
+  const target = new URL(path + url.search, base);
   return Response.redirect(target.toString(), 301);
 }

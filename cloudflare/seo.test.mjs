@@ -9,9 +9,11 @@ import {
   buildSitemapIndexXml,
   buildStaticSitemapUrls,
   buildUrlSetXml,
+  canonicalRequestPath,
   googleSitemapSubmitUrl,
   googleSiteUrl,
   isIndexNowKeyPath,
+  maybeCanonicalRedirect,
   parseWorkId,
   parseWorksPage,
   renderCatalogItem,
@@ -47,6 +49,8 @@ test("robots and sitemap index cover all works", () => {
   assert.match(robots, /User-agent: Baiduspider/);
   assert.match(robots, /Disallow: \/api\//);
   assert.match(robots, /Disallow: \/\?q=/);
+  assert.match(robots, /User-agent: Googlebot\nAllow: \/\nAllow: \/w\/\nAllow: \/works\nDisallow: \/api\/\nDisallow: \/\?q=/);
+  assert.match(robots, /User-agent: Baiduspider\nAllow: \/\nAllow: \/w\/\nAllow: \/works\nDisallow: \/api\/\nDisallow: \/\?q=/);
   assert.match(robots, /Host: s\.pltown\.online/);
   assert.match(robots, /Sitemap: https:\/\/s\.pltown\.online\/sitemap\.xml/);
 
@@ -163,8 +167,30 @@ test("IndexNow key path matches public verification file", () => {
 test("submissionCursor waits after a completed sweep", () => {
   const now = Date.parse("2026-09-07T12:00:00.000Z");
   assert.deepEqual(submissionCursor({ cursor_id: "abc" }, now), { skip: false, cursor: "abc" });
-  assert.deepEqual(submissionCursor({ last_run_at: "2026-09-07T11:00:00.000Z" }, now), { skip: true, cursor: "" });
-  assert.deepEqual(submissionCursor({ last_run_at: "2026-08-01T00:00:00.000Z" }, now), { skip: false, cursor: "" });
+  assert.deepEqual(submissionCursor({ last_run_at: "2026-09-07T11:00:00.000Z", last_status: "caught_up" }, now), { skip: true, cursor: "" });
+  assert.deepEqual(submissionCursor({ last_run_at: "2026-09-07T11:00:00.000Z", last_status: "http_200" }, now), { skip: true, cursor: "" });
+  assert.deepEqual(submissionCursor({ last_run_at: "2026-09-07T11:00:00.000Z", last_status: "http_403:quota" }, now), { skip: false, cursor: "" });
+  assert.deepEqual(submissionCursor({ last_run_at: "2026-09-07T11:00:00.000Z" }, now), { skip: false, cursor: "" });
+  assert.deepEqual(submissionCursor({ last_run_at: "2026-08-01T00:00:00.000Z", last_status: "caught_up" }, now), { skip: false, cursor: "" });
+});
+
+test("canonicalRequestPath collapses index and work aliases", () => {
+  assert.equal(canonicalRequestPath("/index.html"), "/");
+  assert.equal(canonicalRequestPath("/works/"), "/works");
+  assert.equal(canonicalRequestPath("/w/66A473D59E258E6B2F529E29/"), "/w/66a473d59e258e6b2f529e29");
+  assert.equal(canonicalRequestPath("/w/66a473d59e258e6b2f529e29"), "/w/66a473d59e258e6b2f529e29");
+});
+
+test("maybeCanonicalRedirect sends index.html and foreign hosts to the public origin", () => {
+  const env = { SITE_ORIGIN: "https://s.pltown.online" };
+  const index = maybeCanonicalRedirect(null, env, new URL("https://s.pltown.online/index.html"));
+  assert.equal(index.status, 301);
+  assert.equal(index.headers.get("location"), "https://s.pltown.online/");
+  const workers = maybeCanonicalRedirect(null, env, new URL("https://pl-search-cloudflare.workers.dev/w/66A473D59E258E6B2F529E29"));
+  assert.equal(workers.status, 301);
+  assert.equal(workers.headers.get("location"), "https://s.pltown.online/w/66a473d59e258e6b2f529e29");
+  assert.equal(maybeCanonicalRedirect(null, env, new URL("https://s.pltown.online/")), null);
+  assert.equal(maybeCanonicalRedirect(null, env, new URL("https://s.pltown.online/api/meta")), null);
 });
 
 test("parseWorksPage defaults to 1", () => {

@@ -39,8 +39,9 @@
 2. 同一页 Secrets：
    - `BAIDU_ZHANZHANG_TOKEN`：百度搜索资源平台 → 普通收录 → 接口 token
    - `GOOGLE_SA_JSON`：Google Cloud 服务账号 JSON 全文（角色含 Search Console API）
+   - `SEO_SUBMIT_KEY`：手动触发 `GET /api/seo/submit?key=` 的口令；不要复用公开的 IndexNow key
    - 可选 Variable `GOOGLE_SITE_URL`：默认 `https://s.pltown.online/`；若 GSC 用域名资源则填 `sc-domain:pltown.online`
-3. Triggers：Cron `18 */6 * * *` 已启用
+3. Triggers：Cron `18 */6 * * *` 已启用（Cron 不依赖 `SEO_SUBMIT_KEY`）
 4. 打开 `https://s.pltown.online/robots.txt` 与 `https://s.pltown.online/sitemap.xml`
 
 搜索引擎控制台（各做一次）：

@@ -446,7 +446,7 @@ async function handleSeoGet(request, env, url) {
     return textResponse(buildUrlSetXml(urls, lastmod), "application/xml; charset=utf-8");
   }
 
-  if (pathname === "/" || pathname === "/index.html") {
+  if (pathname === "/") {
     const records = await queryAll(
       env,
       "SELECT id, name, userName, year, source, summary FROM data ORDER BY year DESC, id ASC LIMIT ?",
@@ -467,6 +467,9 @@ async function handleSeoGet(request, env, url) {
 
   if (pathname === "/works") {
     const page = parseWorksPage(url);
+    if (url.searchParams.has("page") && page <= 1) {
+      return Response.redirect(`${origin}/works`, 301);
+    }
     const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM data").first();
     const total = Number(countRow?.total ?? 0);
     const offset = (page - 1) * SEO_CONSTANTS.WORKS_PAGE_SIZE;
@@ -544,7 +547,7 @@ export default {
       if (seoResponse) return seoResponse;
 
       if (url.pathname === "/api/seo/submit") {
-        const submitKey = String(env?.INDEXNOW_KEY || "").trim();
+        const submitKey = String(env?.SEO_SUBMIT_KEY || "").trim();
         const given = String(url.searchParams.get("key") || "");
         if (!submitKey || given !== submitKey) return ok({ error: "unauthorized" }, 401);
         const summary = await runSeoSubmission(env);
@@ -610,6 +613,7 @@ export default {
             googleConfigured: Boolean(String(env?.GOOGLE_SA_JSON || "").trim()),
             baiduConfigured: Boolean(String(env?.BAIDU_ZHANZHANG_TOKEN || "").trim()),
             indexnowConfigured: Boolean(String(env?.INDEXNOW_KEY || "").trim()),
+            submitKeyConfigured: Boolean(String(env?.SEO_SUBMIT_KEY || "").trim()),
             state: rows.results ?? [],
           });
         }

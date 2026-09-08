@@ -75,7 +75,7 @@ npm run export-d1
 全部作品：`https://s.pltown.online/works`
 Sitemap：`https://s.pltown.online/sitemap.xml`
 
-Worker Cron 每 6 小时：用 Google Search Console API 提交 sitemap，IndexNow 推送 Bing/Yandex/Naver/Seznam，百度普通收录主动推送。Google 需要 Worker Secret `GOOGLE_SA_JSON`，百度需要 `BAIDU_ZHANZHANG_TOKEN`。
+Worker Cron 每 6 小时：用 Google Search Console API 提交 sitemap，IndexNow 推送 Bing/Yandex/Naver/Seznam，百度普通收录主动推送。Google 需要 Worker Secret `GOOGLE_SA_JSON`，百度需要 `BAIDU_ZHANZHANG_TOKEN`。手动补提交用 Secret `SEO_SUBMIT_KEY` 调 `GET /api/seo/submit?key=`，不要复用公开的 IndexNow key。
 
 ## 埋点与日志
 
